@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+yt-dlp
+static-ffmpeg
+requests
+jinja2
+python-multipart
