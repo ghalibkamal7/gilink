@@ -41,31 +41,6 @@ async def fetch_info(req: InfoRequest):
     except Exception as e:
         return JSONResponse(status_code=400, content={"success": False, "error": str(e)})
 
-# Support GET for backward compatibility
-@app.get("/api/info")
-async def fetch_info_get(url: str = Query(...)):
-    if not url:
-        raise HTTPException(status_code=400, detail="URL cannot be empty")
-    if not (url.startswith("http://") or url.startswith("https://")):
-        url = "https://" + url
-    try:
-        data = get_media_info(url)
-        return JSONResponse(content={"success": True, "data": data})
-    except Exception as e:
-        return JSONResponse(status_code=400, content={"success": False, "error": str(e)})
-    url = req.url.strip()
-    if not url:
-        raise HTTPException(status_code=400, detail="URL cannot be empty")
-    
-    if not (url.startswith("http://") or url.startswith("https://")):
-        url = "https://" + url
-
-    try:
-        data = get_media_info(url)
-        return JSONResponse(content={"success": True, "data": data})
-    except Exception as e:
-        return JSONResponse(status_code=400, content={"success": False, "error": str(e)})
-
 @app.get("/api/download")
 async def trigger_download(
     background_tasks: BackgroundTasks,
