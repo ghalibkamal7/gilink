@@ -9,6 +9,11 @@ try:
 except ImportError:
     from downloader import get_media_info, download_media
 
+try:
+    from .icons import get_icon_bytes
+except ImportError:
+    from icons import get_icon_bytes
+
 app = FastAPI(title="GI LINK Media Downloader", version="1.0.0")
 
 class InfoRequest(BaseModel):
@@ -59,9 +64,7 @@ INDEX_HTML = r"""<!DOCTYPE html>
   <header class="border-b border-slate-800/80 backdrop-blur-md bg-slate-950/80 sticky top-0 z-50">
     <div class="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
       <div class="flex items-center space-x-2.5 cursor-pointer" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
-        <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-md shadow-indigo-500/30">
-          <i data-lucide="download" class="w-4 h-4 text-white"></i>
-        </div>
+        <img src="/icon-192.png" alt="GI LINK" class="w-8 h-8 rounded-lg shadow-md shadow-indigo-500/30 object-cover" />
         <span class="text-lg font-black tracking-tight bg-gradient-to-r from-white via-slate-100 to-indigo-300 bg-clip-text text-transparent">GI LINK</span>
       </div>
       
@@ -246,6 +249,7 @@ INDEX_HTML = r"""<!DOCTYPE html>
   <!-- Footer (Minimal) -->
   <footer class="border-t border-slate-800/60 py-3.5 bg-slate-950 text-center text-[11px] text-slate-500 mt-auto">
     <p>&copy; 2026 GI LINK. Fast &amp; Free Media Downloader.</p>
+    <p class="mt-1 text-slate-600">Created by <span class="text-slate-400 font-medium">Ghalib Kamal</span></p>
   </footer>
 
   <script>
@@ -469,59 +473,31 @@ MANIFEST = {
 async def manifest():
     return JSONResponse(content=MANIFEST, media_type="application/manifest+json")
 
-def _generate_icon_png(size: int) -> bytes:
-    """Generate a clean PNG icon with gradient background and download arrow."""
-    import struct, zlib
-    w = h = size
-    rows = []
-    cx, cy = w / 2, h / 2
-    for y in range(h):
-        row = []
-        for x in range(w):
-            dx = abs(x - cx) / cx
-            dy = abs(y - cy) / cy
-            corner = max(dx, dy)
-            if corner > 0.92:
-                row.extend([0, 0, 0, 0])
-            else:
-                t = (x / w + y / h) / 2
-                cr = int(99 * (1 - t) + 168 * t)
-                cg = int(102 * (1 - t) + 85 * t)
-                cb = int(241 * (1 - t) + 247 * t)
-                nx, ny = (x - cx) / (w * 0.2), (y - cy) / (h * 0.2)
-                is_arrow = False
-                if abs(nx) < 0.35 and -1.2 < ny < 0.6:
-                    is_arrow = True
-                if 0.2 < ny < 1.3 and abs(nx) < (ny - 0.2) * 1.0 and abs(nx) > (ny - 0.2) * 1.0 - 0.4:
-                    is_arrow = True
-                if is_arrow:
-                    row.extend([255, 255, 255, 255])
-                else:
-                    row.extend([cr, cg, cb, 255])
-        rows.append(bytes([0] + row))
-
-    raw = b''.join(rows)
-    def chunk(ctype, data):
-        c = ctype + data
-        return struct.pack('>I', len(data)) + c + struct.pack('>I', zlib.crc32(c) & 0xffffffff)
-
-    sig = b'\x89PNG\r\n\x1a\n'
-    ihdr = struct.pack('>IIBBBBB', w, h, 8, 6, 0, 0, 0)
-    return sig + chunk(b'IHDR', ihdr) + chunk(b'IDAT', zlib.compress(raw, 9)) + chunk(b'IEND', b'')
-
-_icon_cache = {}
-
 @app.get("/icon-192.png")
+@app.get("/icon-192.jpg")
 async def icon_192():
-    if 192 not in _icon_cache:
-        _icon_cache[192] = _generate_icon_png(192)
-    return Response(content=_icon_cache[192], media_type="image/png")
+    return Response(
+        content=get_icon_bytes(192),
+        media_type="image/jpeg",
+        headers={"Cache-Control": "public, max-age=86400"}
+    )
 
 @app.get("/icon-512.png")
+@app.get("/icon-512.jpg")
 async def icon_512():
-    if 512 not in _icon_cache:
-        _icon_cache[512] = _generate_icon_png(512)
-    return Response(content=_icon_cache[512], media_type="image/png")
+    return Response(
+        content=get_icon_bytes(512),
+        media_type="image/jpeg",
+        headers={"Cache-Control": "public, max-age=86400"}
+    )
+
+@app.get("/favicon.ico")
+async def favicon():
+    return Response(
+        content=get_icon_bytes(192),
+        media_type="image/jpeg",
+        headers={"Cache-Control": "public, max-age=86400"}
+    )
 
 SW_JS = """
 const CACHE_NAME = 'gilink-v2';
