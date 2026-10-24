@@ -1,14 +1,19 @@
 import os
 import re
 import uuid
-import static_ffmpeg
+import tempfile
 from typing import Dict, Any, List, Optional
 import yt_dlp
 
-# Ensure ffmpeg paths are accessible
-static_ffmpeg.add_paths()
+# Try to set up ffmpeg paths (may not be available on all platforms)
+try:
+    import static_ffmpeg
+    static_ffmpeg.add_paths()
+except Exception:
+    pass  # ffmpeg may already be on PATH or not needed for info extraction
 
-DOWNLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "downloads")
+# Use /tmp for downloads (works on Vercel's read-only filesystem)
+DOWNLOAD_DIR = os.path.join(tempfile.gettempdir(), "omnidrop_downloads")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
 def sanitize_filename(name: str) -> str:

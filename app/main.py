@@ -4,7 +4,11 @@ from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
-from .downloader import get_media_info, download_media
+
+try:
+    from .downloader import get_media_info, download_media
+except ImportError:
+    from downloader import get_media_info, download_media
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
