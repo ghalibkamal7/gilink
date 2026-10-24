@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks, Query
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -10,12 +11,16 @@ try:
 except ImportError:
     from downloader import get_media_info, download_media
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Resolve paths relative to this file's actual location
+BASE_DIR = Path(__file__).resolve().parent
 
 app = FastAPI(title="OmniDrop Media Downloader", version="1.0.0")
 
-app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
-templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+static_dir = BASE_DIR / "static"
+templates_dir = BASE_DIR / "templates"
+
+app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+templates = Jinja2Templates(directory=str(templates_dir))
 
 class InfoRequest(BaseModel):
     url: str
