@@ -16,6 +16,29 @@ except Exception:
 DOWNLOAD_DIR = os.path.join(tempfile.gettempdir(), "omnidrop_downloads")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
+def get_cookies_filepath() -> Optional[str]:
+    """
+    Checks for Instagram/Social cookies from Environment Variable or local file.
+    Writes env var content to /tmp/cookies.txt if present.
+    """
+    env_cookies = os.environ.get("INSTAGRAM_COOKIES") or os.environ.get("COOKIES_TXT")
+    if env_cookies and env_cookies.strip():
+        cookie_path = os.path.join(tempfile.gettempdir(), "omnidrop_cookies.txt")
+        try:
+            with open(cookie_path, "w", encoding="utf-8") as f:
+                f.write(env_cookies.strip())
+            return cookie_path
+        except Exception as e:
+            print(f"Error writing cookies file: {e}")
+            return None
+
+    # Fallback to local cookies.txt file if present in repo
+    local_cookie = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "cookies.txt")
+    if os.path.exists(local_cookie):
+        return local_cookie
+
+    return None
+
 def sanitize_filename(name: str) -> str:
     """Sanitize string to be safe for filenames."""
     clean = re.sub(r'[\\/*?:"<>|]', "", name)
@@ -63,18 +86,26 @@ def format_filesize(bytes_val: Optional[int]) -> str:
 
 def get_media_info(url: str) -> Dict[str, Any]:
     """Extract metadata and available qualities for a given URL."""
-    ydl_opts = {
+    ydl_opts: Dict[str, Any] = {
         'quiet': True,
         'no_warnings': True,
         'skip_download': True,
         'extract_flat': False,
     }
 
+    # Pass cookies if available (required for Instagram on cloud datacenters)
+    cookie_file = get_cookies_filepath()
+    if cookie_file:
+        ydl_opts['cookiefile'] = cookie_file
+
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
             info = ydl.extract_info(url, download=False)
         except Exception as e:
-            raise ValueError(f"Media fetch failed: {str(e)}")
+            err_msg = str(e)
+            if "Instagram sent an empty media response" in err_msg and not cookie_file:
+                raise ValueError("Instagram requires login session on cloud server. Please configure INSTAGRAM_COOKIES in Vercel environment variables.")
+            raise ValueError(f"Media fetch failed: {err_msg}")
 
         if not info:
             raise ValueError("Could not retrieve media details.")
@@ -178,6 +209,11 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
         'no_warnings': True,
         'restrictfilenames': True,
     }
+
+    # Pass cookies if available
+    cookie_file = get_cookies_filepath()
+    if cookie_file:
+        ydl_opts['cookiefile'] = cookie_file
 
     if is_audio:
         ydl_opts['format'] = 'bestaudio/best'
