@@ -2,19 +2,17 @@ import os
 import re
 import uuid
 import tempfile
+import shutil
 from typing import Dict, Any, List, Optional
 import yt_dlp
-
-# Try to set up ffmpeg paths (may not be available on all platforms)
-try:
-    import static_ffmpeg
-    static_ffmpeg.add_paths()
-except Exception:
-    pass  # ffmpeg may already be on PATH or not needed for info extraction
 
 # Use /tmp for downloads (works on Vercel's read-only filesystem)
 DOWNLOAD_DIR = os.path.join(tempfile.gettempdir(), "omnidrop_downloads")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+def has_ffmpeg() -> bool:
+    """Check if ffmpeg is available in system PATH."""
+    return shutil.which("ffmpeg") is not None
 
 def get_cookies_filepath() -> Optional[str]:
     """
@@ -104,7 +102,7 @@ def get_media_info(url: str) -> Dict[str, Any]:
         except Exception as e:
             err_msg = str(e)
             if "Instagram sent an empty media response" in err_msg and not cookie_file:
-                raise ValueError("Instagram requires login session on cloud server. Please configure INSTAGRAM_COOKIES in Vercel environment variables.")
+                raise ValueError("Instagram requires cookies on cloud server. Please configure INSTAGRAM_COOKIES in Vercel environment variables.")
             raise ValueError(f"Media fetch failed: {err_msg}")
 
         if not info:
@@ -154,7 +152,7 @@ def get_media_info(url: str) -> Dict[str, Any]:
             # Audio-only streams
             elif vcodec == 'none' and acodec != 'none':
                 abr = f.get('abr') or f.get('tbr')
-                abr_str = f"{int(abr)} kbps" if abr else "High Quality"
+                abr_str = f"{int(abr)} kbps" if abr else "Audio"
                 audio_options.append({
                     "id": f.get('format_id'),
                     "quality": abr_str,
@@ -177,13 +175,12 @@ def get_media_info(url: str) -> Dict[str, Any]:
                 "type": "video"
             })
 
-        # Ensure we have standard presets for easy 1-click download
+        # Safe presets that always work (with or without ffmpeg)
         presets = [
-            {"id": "bestvideo+bestaudio/best", "name": "Best Available (HD/4K)", "ext": "mp4", "badge": "Recommended"},
-            {"id": "best[height<=1080]/bestvideo[height<=1080]+bestaudio/best", "name": "1080p Full HD", "ext": "mp4", "badge": "1080p"},
-            {"id": "best[height<=720]/bestvideo[height<=720]+bestaudio/best", "name": "720p HD", "ext": "mp4", "badge": "720p"},
-            {"id": "best[height<=480]/bestvideo[height<=480]+bestaudio/best", "name": "480p SD (Fast)", "ext": "mp4", "badge": "480p"},
-            {"id": "bestaudio/best", "name": "MP3 Audio (Music/Voice)", "ext": "mp3", "badge": "Audio"}
+            {"id": "best", "name": "Best Quality (HD)", "ext": "mp4", "badge": "Fast"},
+            {"id": "best[height<=720]/best", "name": "720p HD", "ext": "mp4", "badge": "720p"},
+            {"id": "best[height<=480]/best", "name": "480p SD", "ext": "mp4", "badge": "480p"},
+            {"id": "bestaudio/best", "name": "Audio Only", "ext": "mp3", "badge": "Audio"}
         ]
 
         return {
@@ -194,7 +191,7 @@ def get_media_info(url: str) -> Dict[str, Any]:
             "platform": platform,
             "url": url,
             "presets": presets,
-            "formats": video_options[:5],
+            "formats": video_options[:4],
             "audio_formats": audio_options[:2]
         }
 
@@ -215,20 +212,45 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
     if cookie_file:
         ydl_opts['cookiefile'] = cookie_file
 
+    ffmpeg_available = has_ffmpeg()
+
     if is_audio:
-        ydl_opts['format'] = 'bestaudio/best'
-        ydl_opts['postprocessors'] = [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }]
+        if ffmpeg_available:
+            ydl_opts['format'] = 'bestaudio/best'
+            ydl_opts['postprocessors'] = [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }]
+        else:
+            # Fallback when ffmpeg is not available: extract direct bestaudio without transcoding
+            ydl_opts['format'] = 'bestaudio/best'
     else:
-        # Merge best video + best audio to mp4
-        ydl_opts['format'] = format_spec or 'bestvideo+bestaudio/best'
-        ydl_opts['merge_output_format'] = 'mp4'
+        # If ffmpeg is present, allow bestvideo+bestaudio merging, else use pre-merged progressive stream
+        if ffmpeg_available and ("+" in format_spec):
+            ydl_opts['format'] = format_spec
+            ydl_opts['merge_output_format'] = 'mp4'
+        else:
+            # Fallback to standalone single stream format (does not require ffmpeg merge)
+            clean_format = format_spec.replace("bestvideo+bestaudio/", "")
+            if "+" in clean_format:
+                clean_format = "best"
+            ydl_opts['format'] = clean_format or 'best'
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
+        try:
+            info = ydl.extract_info(url, download=True)
+        except Exception as e:
+            # If specified format failed (e.g. ffmpeg missing error), retry with safest 'best'
+            if "ffmpeg" in str(e).lower() or "merge" in str(e).lower() or "requested format" in str(e).lower():
+                ydl_opts.pop('merge_output_format', None)
+                ydl_opts.pop('postprocessors', None)
+                ydl_opts['format'] = 'best'
+                with yt_dlp.YoutubeDL(ydl_opts) as retry_ydl:
+                    info = retry_ydl.extract_info(url, download=True)
+            else:
+                raise e
+
         filename = ydl.prepare_filename(info)
         
         # If audio conversion changed ext to mp3

@@ -9,7 +9,7 @@ try:
 except ImportError:
     from downloader import get_media_info, download_media
 
-app = FastAPI(title="OmniDrop Media Downloader", version="1.0.0")
+app = FastAPI(title="GI LINK Media Downloader", version="1.0.0")
 
 class InfoRequest(BaseModel):
     url: str
@@ -26,130 +26,102 @@ INDEX_HTML = r"""<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>OmniDrop - Universal Social Media & Video Downloader</title>
-  <meta name="description" content="Download videos and audio from YouTube, Instagram Reels, TikTok, Facebook, Twitter/X, Reddit, and 1000+ sites in high quality." />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>GI LINK - Universal Video & Audio Downloader</title>
+  <meta name="description" content="Download videos and audio from Instagram Reels, YouTube, TikTok, Facebook, Twitter/X, and 1000+ sites." />
   <!-- PWA Meta Tags -->
-  <meta name="theme-color" content="#020617" />
+  <meta name="theme-color" content="#090d16" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="OmniDrop" />
+  <meta name="apple-mobile-web-app-title" content="GI LINK" />
   <link rel="manifest" href="/manifest.json" />
   <link rel="apple-touch-icon" href="/icon-192.png" />
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            brand: {
-              50: '#eef2ff',
-              100: '#e0e7ff',
-              500: '#6366f1',
-              600: '#4f46e5',
-              700: '#4338ca',
-            }
-          }
-        }
-      }
-    }
-  </script>
   <style>
-    body { font-family: 'Inter', system-ui, sans-serif; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
+      from { opacity: 0; transform: translateY(6px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
+    .animate-fadeIn { animation: fadeIn 0.25s ease-out forwards; }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white">
 
-  <!-- Background Gradients -->
+  <!-- Ambient Glow -->
   <div class="fixed inset-0 overflow-hidden pointer-events-none -z-10">
-    <div class="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-gradient-to-tr from-indigo-600/25 to-pink-500/20 blur-[130px] rounded-full"></div>
-    <div class="absolute bottom-0 right-10 w-[500px] h-[350px] bg-gradient-to-br from-purple-700/15 to-blue-600/15 blur-[120px] rounded-full"></div>
+    <div class="absolute -top-32 left-1/2 -translate-x-1/2 w-[500px] h-[300px] bg-gradient-to-tr from-indigo-600/25 to-pink-500/20 blur-[100px] rounded-full"></div>
   </div>
 
-  <!-- Navbar -->
-  <header class="border-b border-slate-800/80 backdrop-blur-md bg-slate-950/70 sticky top-0 z-50">
-    <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-      <div class="flex items-center space-x-3 cursor-pointer" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-          <i data-lucide="download" class="w-5 h-5 text-white"></i>
+  <!-- Navbar (Compact) -->
+  <header class="border-b border-slate-800/80 backdrop-blur-md bg-slate-950/80 sticky top-0 z-50">
+    <div class="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
+      <div class="flex items-center space-x-2.5 cursor-pointer" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
+        <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-md shadow-indigo-500/30">
+          <i data-lucide="download" class="w-4 h-4 text-white"></i>
         </div>
-        <div>
-          <span class="text-xl font-black tracking-tight bg-gradient-to-r from-white via-slate-200 to-indigo-300 bg-clip-text text-transparent">OmniDrop</span>
-          <span class="hidden sm:inline-block text-xs uppercase px-2 py-0.5 ml-2 rounded-full bg-indigo-500/10 text-indigo-400 font-semibold border border-indigo-500/20">Universal Downloader</span>
-        </div>
+        <span class="text-lg font-black tracking-tight bg-gradient-to-r from-white via-slate-100 to-indigo-300 bg-clip-text text-transparent">GI LINK</span>
       </div>
       
-      <div class="flex items-center space-x-3">
-        <a href="#how-it-works" class="text-sm text-slate-400 hover:text-white transition px-3 py-1.5 rounded-lg hover:bg-slate-800/50">How it Works</a>
-        <a href="#supported" class="text-sm text-slate-400 hover:text-white transition px-3 py-1.5 rounded-lg hover:bg-slate-800/50">Platforms</a>
-        <button id="installBtn" class="hidden items-center space-x-1.5 text-sm bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white px-3.5 py-1.5 rounded-lg transition border border-indigo-500/30 shadow-lg shadow-indigo-500/20 font-semibold">
-          <i data-lucide="download-cloud" class="w-4 h-4"></i>
-          <span>Install App</span>
+      <div class="flex items-center space-x-2">
+        <button id="installBtn" class="hidden items-center space-x-1 text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1.5 rounded-lg transition font-medium shadow-sm">
+          <i data-lucide="download-cloud" class="w-3.5 h-3.5"></i>
+          <span>Install</span>
         </button>
-        <button id="historyBtn" class="flex items-center space-x-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3.5 py-1.5 rounded-lg transition border border-slate-700">
-          <i data-lucide="history" class="w-4 h-4"></i>
-          <span>History</span>
+        <button id="historyBtn" class="flex items-center space-x-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1.5 rounded-lg transition border border-slate-700">
+          <i data-lucide="history" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">History</span>
         </button>
       </div>
     </div>
   </header>
 
-  <!-- Main Hero Content -->
-  <main class="flex-1 max-w-4xl mx-auto px-4 py-12 w-full">
+  <!-- Main Content (Single-Screen Mobile Friendly) -->
+  <main class="flex-1 max-w-3xl mx-auto px-3.5 py-5 sm:py-8 w-full">
     
-    <!-- Hero Title -->
-    <div class="text-center space-y-4 mb-10">
-      <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xs font-semibold">
-        <span class="w-2 h-2 rounded-full bg-indigo-400 animate-pulse"></span>
-        <span>Supports 1000+ Sites &amp; Social Media Apps</span>
-      </div>
-      <h1 class="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-white">
-        Download <span class="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">Any Video or Audio</span> Instantly
+    <!-- Hero Title (Clean & Short) -->
+    <div class="text-center space-y-1.5 mb-5">
+      <h1 class="text-2xl sm:text-4xl font-extrabold tracking-tight text-white">
+        Download <span class="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">Video &amp; Audio</span>
       </h1>
-      <p class="text-base sm:text-lg text-slate-400 max-w-2xl mx-auto">
-        YouTube, Instagram Reels, TikTok, Facebook, Twitter / X, Reddit, and more. Paste your link below to get HD video or MP3 audio in seconds.
+      <p class="text-xs sm:text-sm text-slate-400">
+        Instagram Reels, YouTube, TikTok, Facebook &amp; more
       </p>
     </div>
 
     <!-- URL Input Card -->
-    <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 sm:p-4 shadow-2xl backdrop-blur-xl transition hover:border-slate-700">
-      <form id="urlForm" class="flex flex-col sm:flex-row items-center gap-3">
-        <div class="relative w-full flex-1">
-          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-            <i data-lucide="link-2" class="w-5 h-5"></i>
+    <div class="bg-slate-900/95 border border-slate-800 rounded-xl p-2.5 sm:p-3 shadow-xl backdrop-blur-md">
+      <form id="urlForm" class="flex flex-col sm:flex-row items-stretch gap-2">
+        <div class="relative flex-1">
+          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
+            <i data-lucide="link-2" class="w-4 h-4"></i>
           </div>
           <input 
             type="url" 
             id="urlInput"
-            placeholder="Paste media link here (e.g. Instagram Reel, YouTube, TikTok...)" 
+            placeholder="Paste video or reel link here..." 
             required
-            class="w-full bg-slate-950/80 border border-slate-700/80 rounded-xl pl-11 pr-24 py-3.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500 transition text-sm sm:text-base"
+            class="w-full bg-slate-950 border border-slate-700/80 rounded-lg pl-9 pr-20 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm"
           />
-          <div class="absolute inset-y-0 right-1.5 flex items-center space-x-1">
+          <div class="absolute inset-y-0 right-1 flex items-center space-x-1">
             <button 
               type="button" 
               id="pasteBtn"
               title="Paste from clipboard"
-              class="px-2.5 py-1.5 text-xs font-medium rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition flex items-center space-x-1 border border-slate-700"
+              class="px-2 py-1 text-xs font-medium rounded-md bg-slate-800 text-slate-300 hover:text-white transition flex items-center space-x-1 border border-slate-700"
             >
-              <i data-lucide="clipboard" class="w-3.5 h-3.5"></i>
+              <i data-lucide="clipboard" class="w-3 h-3"></i>
               <span>Paste</span>
             </button>
             <button 
               type="button" 
               id="clearBtn"
               title="Clear input"
-              class="hidden p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition"
+              class="hidden p-1 text-slate-400 hover:text-white rounded"
             >
-              <i data-lucide="x" class="w-4 h-4"></i>
+              <i data-lucide="x" class="w-3.5 h-3.5"></i>
             </button>
           </div>
         </div>
@@ -157,87 +129,76 @@ INDEX_HTML = r"""<!DOCTYPE html>
         <button 
           type="submit" 
           id="fetchBtn"
-          class="w-full sm:w-auto px-7 py-3.5 rounded-xl font-bold text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 transition active:scale-95 flex items-center justify-center space-x-2 shrink-0"
+          class="px-5 py-2.5 rounded-lg font-bold text-sm text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-md transition active:scale-95 flex items-center justify-center space-x-1.5 shrink-0"
         >
           <i data-lucide="search" class="w-4 h-4" id="fetchIcon"></i>
-          <span id="fetchText">Fetch Media</span>
+          <span id="fetchText">Fetch</span>
           <div id="fetchSpinner" class="hidden w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
         </button>
       </form>
     </div>
 
-    <!-- Supported Platforms Grid -->
-    <div id="supported" class="mt-8 pt-4">
-      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider text-center mb-3">Popular Supported Platforms</p>
-      <div class="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 text-xs sm:text-sm text-slate-300">
-        <span class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 flex items-center space-x-1.5 hover:border-red-500/40 transition">
-          <i data-lucide="youtube" class="w-4 h-4 text-red-500"></i>
-          <span>YouTube</span>
-        </span>
-        <span class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 flex items-center space-x-1.5 hover:border-pink-500/40 transition">
-          <i data-lucide="instagram" class="w-4 h-4 text-pink-500"></i>
-          <span>Instagram Reels</span>
-        </span>
-        <span class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 flex items-center space-x-1.5 hover:border-cyan-500/40 transition">
-          <i data-lucide="video" class="w-4 h-4 text-cyan-400"></i>
-          <span>TikTok (No Watermark)</span>
-        </span>
-        <span class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 flex items-center space-x-1.5 hover:border-blue-500/40 transition">
-          <i data-lucide="facebook" class="w-4 h-4 text-blue-500"></i>
-          <span>Facebook</span>
-        </span>
-        <span class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 flex items-center space-x-1.5 hover:border-slate-400 transition">
-          <i data-lucide="twitter" class="w-4 h-4 text-slate-200"></i>
-          <span>Twitter / X</span>
-        </span>
-        <span class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 flex items-center space-x-1.5 hover:border-orange-500/40 transition">
-          <i data-lucide="message-square" class="w-4 h-4 text-orange-500"></i>
-          <span>Reddit</span>
-        </span>
-        <span class="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 flex items-center space-x-1.5 hover:border-red-600/40 transition">
-          <i data-lucide="image" class="w-4 h-4 text-red-400"></i>
-          <span>Pinterest</span>
-        </span>
-      </div>
+    <!-- Supported Platforms Pills (Ultra Compact) -->
+    <div class="mt-3.5 flex flex-wrap items-center justify-center gap-1.5 text-xs text-slate-400">
+      <span class="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 flex items-center space-x-1">
+        <i data-lucide="instagram" class="w-3 h-3 text-pink-500"></i>
+        <span>Instagram</span>
+      </span>
+      <span class="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 flex items-center space-x-1">
+        <i data-lucide="youtube" class="w-3 h-3 text-red-500"></i>
+        <span>YouTube</span>
+      </span>
+      <span class="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 flex items-center space-x-1">
+        <i data-lucide="video" class="w-3 h-3 text-cyan-400"></i>
+        <span>TikTok</span>
+      </span>
+      <span class="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 flex items-center space-x-1">
+        <i data-lucide="facebook" class="w-3 h-3 text-blue-500"></i>
+        <span>Facebook</span>
+      </span>
+      <span class="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 flex items-center space-x-1">
+        <i data-lucide="twitter" class="w-3 h-3 text-slate-300"></i>
+        <span>X / Twitter</span>
+      </span>
     </div>
 
-    <!-- Media Details Card (Initially Hidden) -->
-    <div id="mediaCard" class="hidden mt-8 bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-2xl transition animate-fadeIn">
-      <div class="flex flex-col md:flex-row gap-6">
+    <!-- Media Details Card (Compact) -->
+    <div id="mediaCard" class="hidden mt-4 bg-slate-900 border border-slate-800 rounded-xl p-3.5 shadow-xl animate-fadeIn">
+      <div class="flex flex-col sm:flex-row gap-3.5">
         <!-- Thumbnail -->
-        <div class="relative w-full md:w-72 aspect-video bg-slate-950 rounded-xl overflow-hidden shrink-0 border border-slate-800 flex items-center justify-center">
+        <div class="relative w-full sm:w-44 aspect-video sm:aspect-square max-h-48 bg-slate-950 rounded-lg overflow-hidden shrink-0 border border-slate-800 flex items-center justify-center">
           <img id="mediaThumb" src="" alt="Thumbnail" class="w-full h-full object-cover" />
-          <span id="mediaDuration" class="absolute bottom-2 right-2 bg-black/80 backdrop-blur-sm text-xs font-mono px-2 py-0.5 rounded text-white font-medium"></span>
-          <span id="mediaPlatform" class="absolute top-2 left-2 bg-indigo-600/90 backdrop-blur-sm text-xs font-semibold px-2.5 py-1 rounded-md text-white shadow"></span>
+          <span id="mediaDuration" class="absolute bottom-1.5 right-1.5 bg-black/80 text-[10px] font-mono px-1.5 py-0.5 rounded text-white font-medium"></span>
+          <span id="mediaPlatform" class="absolute top-1.5 left-1.5 bg-indigo-600/90 text-[10px] font-semibold px-2 py-0.5 rounded text-white shadow"></span>
         </div>
 
         <!-- Info & Formats -->
         <div class="flex-1 flex flex-col justify-between">
           <div>
-            <h3 id="mediaTitle" class="text-lg sm:text-xl font-bold text-white line-clamp-2 leading-snug"></h3>
-            <p id="mediaAuthor" class="text-sm text-slate-400 mt-1 flex items-center space-x-1.5">
-              <i data-lucide="user" class="w-4 h-4 text-slate-500"></i>
+            <h3 id="mediaTitle" class="text-sm sm:text-base font-bold text-white line-clamp-2 leading-snug"></h3>
+            <p id="mediaAuthor" class="text-xs text-slate-400 mt-1 flex items-center space-x-1">
+              <i data-lucide="user" class="w-3.5 h-3.5 text-slate-500"></i>
               <span id="authorText">Creator</span>
             </p>
           </div>
 
           <!-- Format Selection -->
-          <div class="mt-5 space-y-3">
-            <label class="text-xs uppercase font-bold text-slate-400 tracking-wider">Choose Download Quality / Format:</label>
-            <div id="formatPresets" class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div class="mt-3">
+            <label class="text-[11px] uppercase font-bold text-slate-400 tracking-wider">Choose Download Option:</label>
+            <div id="formatPresets" class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-1.5">
               <!-- Preset buttons inserted dynamically -->
             </div>
           </div>
 
           <!-- Action Status / Progress Bar -->
-          <div id="downloadStatus" class="hidden mt-4 p-3 rounded-xl bg-slate-950 border border-slate-800">
-            <div class="flex items-center justify-between text-xs text-slate-300 mb-1.5">
-              <span id="statusText" class="font-medium flex items-center space-x-1.5">
-                <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin text-indigo-400"></i>
-                <span>Processing media on server...</span>
+          <div id="downloadStatus" class="hidden mt-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800">
+            <div class="flex items-center justify-between text-xs text-slate-300 mb-1">
+              <span id="statusText" class="font-medium flex items-center space-x-1.5 text-indigo-300">
+                <i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i>
+                <span>Preparing download...</span>
               </span>
             </div>
-            <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
               <div id="statusBar" class="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full w-2/3 animate-pulse"></div>
             </div>
           </div>
@@ -247,60 +208,11 @@ INDEX_HTML = r"""<!DOCTYPE html>
     </div>
 
     <!-- Error Alert Card -->
-    <div id="errorCard" class="hidden mt-6 p-4 rounded-xl bg-red-950/40 border border-red-800/60 text-red-200 text-sm flex items-start space-x-3">
-      <i data-lucide="alert-circle" class="w-5 h-5 text-red-400 shrink-0 mt-0.5"></i>
+    <div id="errorCard" class="hidden mt-3.5 p-3 rounded-lg bg-red-950/40 border border-red-800/60 text-red-200 text-xs flex items-start space-x-2">
+      <i data-lucide="alert-circle" class="w-4 h-4 text-red-400 shrink-0 mt-0.5"></i>
       <div>
-        <p class="font-semibold text-red-300" id="errorTitle">Download Error</p>
-        <p class="text-xs text-red-200/80 mt-1" id="errorMessage">Could not fetch video. Please make sure the URL is public and valid.</p>
-      </div>
-    </div>
-
-    <!-- Feature Highlights -->
-    <div class="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6">
-      <div class="p-5 rounded-2xl bg-slate-900/60 border border-slate-800/80">
-        <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center mb-4">
-          <i data-lucide="sparkles" class="w-5 h-5"></i>
-        </div>
-        <h4 class="font-bold text-white mb-1">No Watermarks</h4>
-        <p class="text-sm text-slate-400">Download TikTok, Instagram, and Shorts without any annoying watermarks or logos.</p>
-      </div>
-
-      <div class="p-5 rounded-2xl bg-slate-900/60 border border-slate-800/80">
-        <div class="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center mb-4">
-          <i data-lucide="zap" class="w-5 h-5"></i>
-        </div>
-        <h4 class="font-bold text-white mb-1">Lightning Fast</h4>
-        <p class="text-sm text-slate-400">Direct server-side extraction and MP4/MP3 conversion powered by high-speed engines.</p>
-      </div>
-
-      <div class="p-5 rounded-2xl bg-slate-900/60 border border-slate-800/80">
-        <div class="w-10 h-10 rounded-xl bg-pink-500/10 text-pink-400 flex items-center justify-center mb-4">
-          <i data-lucide="shield-check" class="w-5 h-5"></i>
-        </div>
-        <h4 class="font-bold text-white mb-1">100% Free &amp; Secure</h4>
-        <p class="text-sm text-slate-400">No account required, no registration, no hidden limits. Safe and privacy focused.</p>
-      </div>
-    </div>
-
-    <!-- How It Works Section -->
-    <div id="how-it-works" class="mt-16 pt-8 border-t border-slate-800/80">
-      <h2 class="text-2xl font-bold text-center text-white mb-8">How to Download in 3 Steps</h2>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
-        <div class="flex flex-col items-center p-4">
-          <div class="w-12 h-12 rounded-full bg-slate-800 text-indigo-400 font-extrabold text-lg flex items-center justify-center mb-3 border border-slate-700">1</div>
-          <h4 class="font-semibold text-white mb-1">Copy Link</h4>
-          <p class="text-xs text-slate-400">Copy the video or reel link from Instagram, YouTube, TikTok, or any social app.</p>
-        </div>
-        <div class="flex flex-col items-center p-4">
-          <div class="w-12 h-12 rounded-full bg-slate-800 text-indigo-400 font-extrabold text-lg flex items-center justify-center mb-3 border border-slate-700">2</div>
-          <h4 class="font-semibold text-white mb-1">Paste &amp; Fetch</h4>
-          <p class="text-xs text-slate-400">Paste the URL in the box above and click "Fetch Media" to extract formats.</p>
-        </div>
-        <div class="flex flex-col items-center p-4">
-          <div class="w-12 h-12 rounded-full bg-slate-800 text-indigo-400 font-extrabold text-lg flex items-center justify-center mb-3 border border-slate-700">3</div>
-          <h4 class="font-semibold text-white mb-1">Download File</h4>
-          <p class="text-xs text-slate-400">Select MP4 video resolution or MP3 audio and enjoy your download offline.</p>
-        </div>
+        <p class="font-semibold text-red-300" id="errorTitle">Fetch Error</p>
+        <p class="text-red-200/80 mt-0.5" id="errorMessage">Could not fetch video. Please check link.</p>
       </div>
     </div>
 
@@ -308,35 +220,32 @@ INDEX_HTML = r"""<!DOCTYPE html>
 
   <!-- History Drawer Modal -->
   <div id="historyModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex justify-end">
-    <div class="w-full max-w-md bg-slate-900 border-l border-slate-800 h-full p-6 overflow-y-auto flex flex-col justify-between">
+    <div class="w-full max-w-sm bg-slate-900 border-l border-slate-800 h-full p-4 overflow-y-auto flex flex-col justify-between">
       <div>
-        <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
           <div class="flex items-center space-x-2">
-            <i data-lucide="history" class="w-5 h-5 text-indigo-400"></i>
-            <h3 class="font-bold text-white text-lg">Download History</h3>
+            <i data-lucide="history" class="w-4 h-4 text-indigo-400"></i>
+            <h3 class="font-bold text-white text-base">Download History</h3>
           </div>
-          <button id="closeHistoryBtn" class="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white">
-            <i data-lucide="x" class="w-5 h-5"></i>
+          <button id="closeHistoryBtn" class="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-white">
+            <i data-lucide="x" class="w-4 h-4"></i>
           </button>
         </div>
-        <div id="historyList" class="mt-4 space-y-3">
+        <div id="historyList" class="mt-3 space-y-2 text-xs">
           <!-- History items -->
         </div>
       </div>
-      <div class="pt-4 border-t border-slate-800">
-        <button id="clearHistoryBtn" class="w-full py-2 text-xs font-semibold text-red-400 hover:bg-red-500/10 rounded-lg transition border border-red-500/20">
+      <div class="pt-3 border-t border-slate-800">
+        <button id="clearHistoryBtn" class="w-full py-1.5 text-xs font-semibold text-red-400 hover:bg-red-500/10 rounded transition border border-red-500/20">
           Clear History
         </button>
       </div>
     </div>
   </div>
 
-  <!-- Footer -->
-  <footer class="border-t border-slate-800/80 py-6 mt-16 bg-slate-950 text-center text-xs text-slate-500">
-    <div class="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-      <p>&copy; 2026 OmniDrop. All rights reserved. For personal and fair-use only.</p>
-      <p class="text-slate-400">FastAPI &amp; yt-dlp Fullstack Application</p>
-    </div>
+  <!-- Footer (Minimal) -->
+  <footer class="border-t border-slate-800/60 py-3.5 bg-slate-950 text-center text-[11px] text-slate-500 mt-auto">
+    <p>&copy; 2026 GI LINK. Fast &amp; Free Media Downloader.</p>
   </footer>
 
   <script>
@@ -358,7 +267,6 @@ INDEX_HTML = r"""<!DOCTYPE html>
     const formatPresets = document.getElementById('formatPresets');
     const downloadStatus = document.getElementById('downloadStatus');
     const statusText = document.getElementById('statusText');
-    const statusBar = document.getElementById('statusBar');
     const historyBtn = document.getElementById('historyBtn');
     const historyModal = document.getElementById('historyModal');
     const closeHistoryBtn = document.getElementById('closeHistoryBtn');
@@ -369,13 +277,14 @@ INDEX_HTML = r"""<!DOCTYPE html>
 
     const updateHistory = (item) => {
       const div = document.createElement('div');
-      div.className = 'p-3 rounded-lg bg-slate-800/50 border border-slate-700';
-      div.innerHTML = `<a href="#" class="text-indigo-300 hover:underline" data-url="${item.url}">${item.title}</a> - ${item.platform}`;
+      div.className = 'p-2 rounded bg-slate-800/50 border border-slate-700/60';
+      div.innerHTML = `<a href="#" class="text-indigo-300 hover:underline line-clamp-1" data-url="${item.url}">${item.title}</a><span class="text-slate-500 text-[10px]">${item.platform}</span>`;
       historyList.prepend(div);
       div.querySelector('a').addEventListener('click', (e) => {
         e.preventDefault();
         urlInput.value = item.url;
         fetchMedia();
+        historyModal.classList.add('hidden');
       });
     };
 
@@ -387,6 +296,8 @@ INDEX_HTML = r"""<!DOCTYPE html>
       fetchBtn.disabled = true;
       errorCard.classList.add('hidden');
       mediaCard.classList.add('hidden');
+      downloadStatus.classList.add('hidden');
+
       try {
         const resp = await fetch('/api/info', {
           method: 'POST',
@@ -394,23 +305,23 @@ INDEX_HTML = r"""<!DOCTYPE html>
           body: JSON.stringify({ url })
         });
         const data = await resp.json();
-        if (!data.success) throw new Error(data.error || 'Unknown error');
+        if (!data.success) throw new Error(data.error || 'Failed to retrieve media');
         const info = data.data;
         mediaThumb.src = info.thumbnail || '';
         mediaTitle.textContent = info.title;
         mediaAuthor.textContent = info.uploader;
-        mediaDuration.textContent = info.duration;
+        mediaDuration.textContent = info.duration || '';
         mediaPlatform.textContent = info.platform;
         formatPresets.innerHTML = '';
+
         info.presets.forEach(p => {
           const btn = document.createElement('button');
-          btn.className = 'w-full px-3 py-2 text-sm rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition';
-          btn.textContent = p.name;
-          btn.dataset.format = p.id;
-          btn.dataset.audio = p.ext === "mp3" ? 'true' : 'false';
-          btn.addEventListener('click', () => startDownload(url, p.id, p.ext === "mp3"));
+          btn.className = 'w-full px-3 py-2 text-xs rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 transition flex items-center justify-between font-medium active:scale-98';
+          btn.innerHTML = `<span>${p.name}</span><span class="text-[10px] text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">${p.badge || p.ext}</span>`;
+          btn.addEventListener('click', () => startDownload(url, p.id, p.ext === 'mp3'));
           formatPresets.appendChild(btn);
         });
+
         mediaCard.classList.remove('hidden');
         updateHistory({ url, title: info.title, platform: info.platform });
       } catch (e) {
@@ -420,18 +331,52 @@ INDEX_HTML = r"""<!DOCTYPE html>
         fetchSpinner.classList.add('hidden');
         fetchIcon.classList.remove('hidden');
         fetchBtn.disabled = false;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
       }
     };
 
-    const startDownload = (url, formatSpec, isAudio) => {
+    const startDownload = async (url, formatSpec, isAudio) => {
       downloadStatus.classList.remove('hidden');
-      statusText.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin text-indigo-400"></i> Preparing download...`;
+      statusText.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Downloading media file...</span>`;
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+
       const dlUrl = `/api/download?url=${encodeURIComponent(url)}&format_spec=${encodeURIComponent(formatSpec)}&is_audio=${isAudio}`;
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      iframe.src = dlUrl;
-      document.body.appendChild(iframe);
-      setTimeout(() => downloadStatus.classList.add('hidden'), 3000);
+
+      try {
+        const res = await fetch(dlUrl);
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || 'Download request failed (' + res.status + ')');
+        }
+
+        // Get filename from Content-Disposition header
+        let filename = 'media_download.mp4';
+        const disposition = res.headers.get('content-disposition');
+        if (disposition && disposition.indexOf('filename=') !== -1) {
+          const matches = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/.exec(disposition);
+          if (matches != null && matches[1]) {
+            filename = matches[1].replace(/['"]/g, '');
+          }
+        }
+
+        const blob = await res.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(blobUrl);
+        a.remove();
+
+        statusText.innerHTML = `<i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400"></i><span class="text-emerald-400">Download complete!</span>`;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+        setTimeout(() => downloadStatus.classList.add('hidden'), 4000);
+      } catch (err) {
+        statusText.innerHTML = `<i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-red-400"></i><span class="text-red-400">${err.message}</span>`;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+      }
     };
 
     urlForm.addEventListener('submit', (e) => { e.preventDefault(); fetchMedia(); });
@@ -452,7 +397,6 @@ INDEX_HTML = r"""<!DOCTYPE html>
     closeHistoryBtn.addEventListener('click', () => historyModal.classList.add('hidden'));
     clearHistoryBtn.addEventListener('click', () => { historyList.innerHTML = ''; });
 
-    // Initialize Lucide icons
     if (typeof lucide !== 'undefined') lucide.createIcons();
   });
 
@@ -481,7 +425,6 @@ INDEX_HTML = r"""<!DOCTYPE html>
       if (!deferredPrompt) return;
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
-      console.log('Install outcome:', outcome);
       deferredPrompt = null;
       installBtn.classList.add('hidden');
       installBtn.classList.remove('flex');
@@ -489,7 +432,6 @@ INDEX_HTML = r"""<!DOCTYPE html>
   }
 
   window.addEventListener('appinstalled', () => {
-    console.log('OmniDrop installed!');
     deferredPrompt = null;
     if (installBtn) {
       installBtn.classList.add('hidden');
@@ -507,9 +449,9 @@ async def home():
 # --- PWA Endpoints ---
 
 MANIFEST = {
-    "name": "OmniDrop - Universal Media Downloader",
-    "short_name": "OmniDrop",
-    "description": "Download videos and audio from YouTube, Instagram, TikTok, Facebook, Twitter/X, Reddit and 1000+ sites.",
+    "name": "GI LINK - Universal Media Downloader",
+    "short_name": "GI LINK",
+    "description": "Download videos and audio from Instagram Reels, YouTube, TikTok, Facebook, Twitter/X and more.",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#020617",
@@ -528,42 +470,35 @@ async def manifest():
     return JSONResponse(content=MANIFEST, media_type="application/manifest+json")
 
 def _generate_icon_png(size: int) -> bytes:
-    """Generate a simple PNG icon with gradient-style background and download arrow."""
+    """Generate a clean PNG icon with gradient background and download arrow."""
     import struct, zlib
-    # Create a simple icon: indigo/purple rounded square with a white down-arrow
     w = h = size
     rows = []
     cx, cy = w / 2, h / 2
-    r = w * 0.42  # corner radius boundary
     for y in range(h):
         row = []
         for x in range(w):
-            # Distance from center for rounded square
             dx = abs(x - cx) / cx
             dy = abs(y - cy) / cy
             corner = max(dx, dy)
             if corner > 0.92:
-                row.extend([0, 0, 0, 0])  # transparent outside
+                row.extend([0, 0, 0, 0])
             else:
-                # Gradient: top-left indigo to bottom-right purple
                 t = (x / w + y / h) / 2
                 cr = int(99 * (1 - t) + 168 * t)
                 cg = int(102 * (1 - t) + 85 * t)
                 cb = int(241 * (1 - t) + 247 * t)
-                # Draw white arrow in center
                 nx, ny = (x - cx) / (w * 0.2), (y - cy) / (h * 0.2)
                 is_arrow = False
-                # Arrow shaft
                 if abs(nx) < 0.35 and -1.2 < ny < 0.6:
                     is_arrow = True
-                # Arrow head (V shape)
                 if 0.2 < ny < 1.3 and abs(nx) < (ny - 0.2) * 1.0 and abs(nx) > (ny - 0.2) * 1.0 - 0.4:
                     is_arrow = True
                 if is_arrow:
                     row.extend([255, 255, 255, 255])
                 else:
                     row.extend([cr, cg, cb, 255])
-        rows.append(bytes([0] + row))  # filter byte + RGBA
+        rows.append(bytes([0] + row))
 
     raw = b''.join(rows)
     def chunk(ctype, data):
@@ -574,7 +509,6 @@ def _generate_icon_png(size: int) -> bytes:
     ihdr = struct.pack('>IIBBBBB', w, h, 8, 6, 0, 0, 0)
     return sig + chunk(b'IHDR', ihdr) + chunk(b'IDAT', zlib.compress(raw, 9)) + chunk(b'IEND', b'')
 
-# Cache generated icons
 _icon_cache = {}
 
 @app.get("/icon-192.png")
@@ -590,7 +524,7 @@ async def icon_512():
     return Response(content=_icon_cache[512], media_type="image/png")
 
 SW_JS = """
-const CACHE_NAME = 'omnidrop-v1';
+const CACHE_NAME = 'gilink-v2';
 const STATIC_ASSETS = [
   '/',
   'https://cdn.tailwindcss.com',
@@ -615,7 +549,6 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-  // Don't cache API calls
   if (url.pathname.startsWith('/api/')) {
     return event.respondWith(fetch(event.request));
   }
@@ -656,7 +589,7 @@ async def fetch_info(req: InfoRequest):
 async def trigger_download(
     background_tasks: BackgroundTasks,
     url: str = Query(...),
-    format_spec: str = Query("bestvideo+bestaudio/best"),
+    format_spec: str = Query("best"),
     is_audio: bool = Query(False)
 ):
     url = url.strip()
@@ -682,4 +615,4 @@ async def trigger_download(
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "app": "OmniDrop Media Downloader"}
+    return {"status": "ok", "app": "GI LINK Media Downloader"}
