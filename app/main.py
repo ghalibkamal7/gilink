@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException, BackgroundTasks, Query
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, Response
 from pydantic import BaseModel
 
 try:
@@ -29,6 +29,14 @@ INDEX_HTML = r"""<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>OmniDrop - Universal Social Media & Video Downloader</title>
   <meta name="description" content="Download videos and audio from YouTube, Instagram Reels, TikTok, Facebook, Twitter/X, Reddit, and 1000+ sites in high quality." />
+  <!-- PWA Meta Tags -->
+  <meta name="theme-color" content="#020617" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="OmniDrop" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script>
@@ -82,6 +90,10 @@ INDEX_HTML = r"""<!DOCTYPE html>
       <div class="flex items-center space-x-3">
         <a href="#how-it-works" class="text-sm text-slate-400 hover:text-white transition px-3 py-1.5 rounded-lg hover:bg-slate-800/50">How it Works</a>
         <a href="#supported" class="text-sm text-slate-400 hover:text-white transition px-3 py-1.5 rounded-lg hover:bg-slate-800/50">Platforms</a>
+        <button id="installBtn" class="hidden items-center space-x-1.5 text-sm bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white px-3.5 py-1.5 rounded-lg transition border border-indigo-500/30 shadow-lg shadow-indigo-500/20 font-semibold">
+          <i data-lucide="download-cloud" class="w-4 h-4"></i>
+          <span>Install App</span>
+        </button>
         <button id="historyBtn" class="flex items-center space-x-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 px-3.5 py-1.5 rounded-lg transition border border-slate-700">
           <i data-lucide="history" class="w-4 h-4"></i>
           <span>History</span>
@@ -443,6 +455,47 @@ INDEX_HTML = r"""<!DOCTYPE html>
     // Initialize Lucide icons
     if (typeof lucide !== 'undefined') lucide.createIcons();
   });
+
+  // --- PWA: Service Worker Registration ---
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js').then(reg => {
+      console.log('SW registered:', reg.scope);
+    }).catch(err => console.log('SW registration failed:', err));
+  }
+
+  // --- PWA: Install Prompt ---
+  let deferredPrompt = null;
+  const installBtn = document.getElementById('installBtn');
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    if (installBtn) {
+      installBtn.classList.remove('hidden');
+      installBtn.classList.add('flex');
+    }
+  });
+
+  if (installBtn) {
+    installBtn.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log('Install outcome:', outcome);
+      deferredPrompt = null;
+      installBtn.classList.add('hidden');
+      installBtn.classList.remove('flex');
+    });
+  }
+
+  window.addEventListener('appinstalled', () => {
+    console.log('OmniDrop installed!');
+    deferredPrompt = null;
+    if (installBtn) {
+      installBtn.classList.add('hidden');
+      installBtn.classList.remove('flex');
+    }
+  });
   </script>
 </body>
 </html>"""
@@ -450,6 +503,141 @@ INDEX_HTML = r"""<!DOCTYPE html>
 @app.get("/", response_class=HTMLResponse)
 async def home():
     return HTMLResponse(content=INDEX_HTML)
+
+# --- PWA Endpoints ---
+
+MANIFEST = {
+    "name": "OmniDrop - Universal Media Downloader",
+    "short_name": "OmniDrop",
+    "description": "Download videos and audio from YouTube, Instagram, TikTok, Facebook, Twitter/X, Reddit and 1000+ sites.",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#020617",
+    "theme_color": "#020617",
+    "orientation": "any",
+    "categories": ["utilities", "entertainment"],
+    "icons": [
+        {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+        {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+    ],
+    "screenshots": []
+}
+
+@app.get("/manifest.json")
+async def manifest():
+    return JSONResponse(content=MANIFEST, media_type="application/manifest+json")
+
+def _generate_icon_png(size: int) -> bytes:
+    """Generate a simple PNG icon with gradient-style background and download arrow."""
+    import struct, zlib
+    # Create a simple icon: indigo/purple rounded square with a white down-arrow
+    w = h = size
+    rows = []
+    cx, cy = w / 2, h / 2
+    r = w * 0.42  # corner radius boundary
+    for y in range(h):
+        row = []
+        for x in range(w):
+            # Distance from center for rounded square
+            dx = abs(x - cx) / cx
+            dy = abs(y - cy) / cy
+            corner = max(dx, dy)
+            if corner > 0.92:
+                row.extend([0, 0, 0, 0])  # transparent outside
+            else:
+                # Gradient: top-left indigo to bottom-right purple
+                t = (x / w + y / h) / 2
+                cr = int(99 * (1 - t) + 168 * t)
+                cg = int(102 * (1 - t) + 85 * t)
+                cb = int(241 * (1 - t) + 247 * t)
+                # Draw white arrow in center
+                nx, ny = (x - cx) / (w * 0.2), (y - cy) / (h * 0.2)
+                is_arrow = False
+                # Arrow shaft
+                if abs(nx) < 0.35 and -1.2 < ny < 0.6:
+                    is_arrow = True
+                # Arrow head (V shape)
+                if 0.2 < ny < 1.3 and abs(nx) < (ny - 0.2) * 1.0 and abs(nx) > (ny - 0.2) * 1.0 - 0.4:
+                    is_arrow = True
+                if is_arrow:
+                    row.extend([255, 255, 255, 255])
+                else:
+                    row.extend([cr, cg, cb, 255])
+        rows.append(bytes([0] + row))  # filter byte + RGBA
+
+    raw = b''.join(rows)
+    def chunk(ctype, data):
+        c = ctype + data
+        return struct.pack('>I', len(data)) + c + struct.pack('>I', zlib.crc32(c) & 0xffffffff)
+
+    sig = b'\x89PNG\r\n\x1a\n'
+    ihdr = struct.pack('>IIBBBBB', w, h, 8, 6, 0, 0, 0)
+    return sig + chunk(b'IHDR', ihdr) + chunk(b'IDAT', zlib.compress(raw, 9)) + chunk(b'IEND', b'')
+
+# Cache generated icons
+_icon_cache = {}
+
+@app.get("/icon-192.png")
+async def icon_192():
+    if 192 not in _icon_cache:
+        _icon_cache[192] = _generate_icon_png(192)
+    return Response(content=_icon_cache[192], media_type="image/png")
+
+@app.get("/icon-512.png")
+async def icon_512():
+    if 512 not in _icon_cache:
+        _icon_cache[512] = _generate_icon_png(512)
+    return Response(content=_icon_cache[512], media_type="image/png")
+
+SW_JS = """
+const CACHE_NAME = 'omnidrop-v1';
+const STATIC_ASSETS = [
+  '/',
+  'https://cdn.tailwindcss.com',
+  'https://unpkg.com/lucide@latest'
+];
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
+  );
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+    )
+  );
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+  // Don't cache API calls
+  if (url.pathname.startsWith('/api/')) {
+    return event.respondWith(fetch(event.request));
+  }
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      const fetched = fetch(event.request).then((response) => {
+        if (response && response.status === 200) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      }).catch(() => cached);
+      return cached || fetched;
+    })
+  );
+});
+"""
+
+@app.get("/sw.js")
+async def service_worker():
+    return Response(content=SW_JS, media_type="application/javascript",
+                    headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"})
 
 @app.post("/api/info")
 async def fetch_info(req: InfoRequest):
