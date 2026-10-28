@@ -34,6 +34,7 @@ def render_layout(
   <meta name="author" content="Ghalib Kamal" />
   <meta name="robots" content="index, follow" />
   <meta name="google-site-verification" content="Du_RVrnTwPBjSXPQjQ-RlDluCuEo0A4QMPz9vAWXjDY" />
+  <meta name="google-adsense-account" content="ca-pub-6837969928640726" />
   <link rel="canonical" href="{canonical_url}" />
 
   <!-- Open Graph / Facebook -->

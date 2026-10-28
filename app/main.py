@@ -271,9 +271,7 @@ async def ads_txt():
         content = custom_ads_txt.strip() + "\n"
     else:
         content = (
-            "# Google AdSense ads.txt for GI LINK\n"
-            "# Replace or add your AdSense Publisher ID in Vercel env var ADS_TXT_CONTENT:\n"
-            "# google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0\n"
+            "google.com, pub-6837969928640726, DIRECT, f08c47fec0942fa0\n"
         )
     return Response(
         content=content,
