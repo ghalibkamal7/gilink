@@ -33,6 +33,7 @@ def render_layout(
   <meta name="keywords" content="video downloader, reels downloader, instagram reel download, mp4 downloader, audio extractor, online media downloader, GI LINK, free video download" />
   <meta name="author" content="Ghalib Kamal" />
   <meta name="robots" content="index, follow" />
+  <meta name="google-site-verification" content="Du_RVrnTwPBjSXPQjQ-RlDluCuEo0A4QMPz9vAWXjDY" />
   <link rel="canonical" href="{canonical_url}" />
 
   <!-- Open Graph / Facebook -->
