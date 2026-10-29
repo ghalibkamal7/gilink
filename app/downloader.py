@@ -97,7 +97,7 @@ def get_media_info(url: str) -> Dict[str, Any]:
         'extract_flat': False,
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'web']
+                'player_client': ['android_vr', 'android', 'web']
             }
         }
     }
@@ -218,7 +218,7 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
         'restrictfilenames': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'web']
+                'player_client': ['android_vr', 'android', 'web']
             }
         }
     }
