@@ -4,6 +4,7 @@ import uuid
 import tempfile
 import shutil
 from typing import Dict, Any, List, Optional
+import requests
 import yt_dlp
 
 try:
@@ -134,6 +135,93 @@ def format_filesize(bytes_val: Optional[int]) -> str:
         bytes_val /= 1024.0
     return f"{bytes_val:.1f} TB"
 
+def extract_youtube_fallback(url: str) -> Optional[Dict[str, Any]]:
+    """Fallback YouTube extractor via reliable Invidious nodes if yt-dlp encounters cloud bot protection."""
+    vid_match = re.search(r'(?:v=|\/|youtu\.be\/|shorts\/)([0-9A-Za-z_-]{11})', url)
+    if not vid_match:
+        return None
+    video_id = vid_match.group(1)
+    instances = [
+        'https://yt.chocolatemoo53.com',
+        'https://invidious.nerdvpn.de',
+        'https://inv.nadeko.net'
+    ]
+    for inst in instances:
+        try:
+            r = requests.get(f'{inst}/api/v1/videos/{video_id}', timeout=4)
+            if r.status_code == 200:
+                data = r.json()
+                title = data.get('title') or "YouTube Video"
+                duration = format_duration(data.get('lengthSeconds'))
+                uploader = data.get('author') or "YouTube Creator"
+                thumbs = data.get('videoThumbnails') or []
+                thumbnail = thumbs[-1].get('url') if thumbs else f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
+                if thumbnail.startswith("/"):
+                    thumbnail = f"https://i.ytimg.com{thumbnail}"
+                
+                presets = [
+                    {"id": "best", "name": "Best Quality (HD)", "ext": "mp4", "badge": "Fast"},
+                    {"id": "best[height<=720]/best", "name": "720p HD", "ext": "mp4", "badge": "720p"},
+                    {"id": "best[height<=480]/best", "name": "480p SD", "ext": "mp4", "badge": "480p"},
+                    {"id": "bestaudio/best", "name": "Audio Only", "ext": "mp3", "badge": "Audio"}
+                ]
+                return {
+                    "title": title,
+                    "thumbnail": thumbnail,
+                    "duration": duration,
+                    "uploader": uploader,
+                    "platform": "YouTube",
+                    "url": url,
+                    "presets": presets,
+                    "formats": [
+                        {"id": "best", "quality": "HD (720p/360p)", "height": 720, "ext": "mp4", "size": "Auto", "type": "video"}
+                    ],
+                    "audio_formats": [
+                        {"id": "bestaudio", "quality": "128 kbps", "ext": "mp3", "size": "Auto", "type": "audio"}
+                    ]
+                }
+        except Exception:
+            continue
+    return None
+
+def download_youtube_fallback(url: str, req_id: str) -> Optional[Dict[str, Any]]:
+    """Fallback YouTube stream downloader if cloud datacenter IPs are blocked."""
+    vid_match = re.search(r'(?:v=|\/|youtu\.be\/|shorts\/)([0-9A-Za-z_-]{11})', url)
+    if not vid_match:
+        return None
+    video_id = vid_match.group(1)
+    instances = [
+        'https://yt.chocolatemoo53.com',
+        'https://invidious.nerdvpn.de',
+        'https://inv.nadeko.net'
+    ]
+    for inst in instances:
+        try:
+            r = requests.get(f'{inst}/api/v1/videos/{video_id}', timeout=4)
+            if r.status_code == 200:
+                data = r.json()
+                title = data.get('title') or "YouTube_Media"
+                streams = data.get('formatStreams') or []
+                if streams:
+                    dl_url = streams[0].get('url')
+                    if dl_url:
+                        safe_title = sanitize_filename(title)
+                        target_file = os.path.join(DOWNLOAD_DIR, f"{req_id}_{safe_title}.mp4")
+                        with requests.get(dl_url, stream=True, timeout=20) as resp:
+                            if resp.status_code == 200:
+                                with open(target_file, 'wb') as f:
+                                    for chunk in resp.iter_content(chunk_size=64 * 1024):
+                                        if chunk:
+                                            f.write(chunk)
+                                return {
+                                    "filepath": target_file,
+                                    "filename": f"{safe_title}.mp4",
+                                    "filesize": os.path.getsize(target_file)
+                                }
+        except Exception:
+            continue
+    return None
+
 def get_media_info(url: str) -> Dict[str, Any]:
     """Extract metadata and available qualities for a given URL."""
     ydl_opts: Dict[str, Any] = {
@@ -143,7 +231,7 @@ def get_media_info(url: str) -> Dict[str, Any]:
         'extract_flat': False,
         'extractor_args': {
             'youtube': {
-                'player_client': ['android_vr', 'android', 'web']
+                'player_client': ['android']
             }
         }
     }
@@ -157,11 +245,17 @@ def get_media_info(url: str) -> Dict[str, Any]:
     if proxy and proxy.strip():
         ydl_opts['proxy'] = proxy.strip()
 
+    info = None
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
             info = ydl.extract_info(url, download=False)
         except Exception as e:
             err_msg = str(e)
+            # Automatic fallback for YouTube if cloud IP is challenged
+            if detect_platform(url) == "YouTube":
+                fallback = extract_youtube_fallback(url)
+                if fallback:
+                    return fallback
             if "Instagram sent an empty media response" in err_msg and not cookie_file:
                 raise ValueError("Instagram requires cookies on cloud server. Please configure INSTAGRAM_COOKIES in Vercel environment variables.")
             if ("Sign in to confirm you’re not a bot" in err_msg or "Sign in to confirm" in err_msg):
@@ -169,6 +263,10 @@ def get_media_info(url: str) -> Dict[str, Any]:
             raise ValueError(f"Media fetch failed: {err_msg}")
 
         if not info:
+            if detect_platform(url) == "YouTube":
+                fallback = extract_youtube_fallback(url)
+                if fallback:
+                    return fallback
             raise ValueError("Could not retrieve media details.")
 
         # If it's a playlist or multiple entries, pick the first
@@ -270,7 +368,7 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
         'restrictfilenames': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['android_vr', 'android', 'web']
+                'player_client': ['android']
             }
         }
     }
@@ -307,7 +405,7 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
             clean_format = format_spec.replace("bestvideo+bestaudio/", "")
             if "+" in clean_format or clean_format == "best":
                 # Prefer progressive streams containing both audio and video (format 18 is YouTube's reliable standard)
-                ydl_opts['format'] = 'best[vcodec!=none][acodec!=none]/18/best/b'
+                ydl_opts['format'] = '18/best[vcodec!=none][acodec!=none]/best/b'
             elif "height<=720" in clean_format:
                 ydl_opts['format'] = 'best[height<=720][acodec!=none]/18/best[acodec!=none]/best'
             elif "height<=480" in clean_format:
@@ -315,6 +413,7 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
             else:
                 ydl_opts['format'] = f"{clean_format}/best[acodec!=none]/18/best/b"
 
+    info = None
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
             info = ydl.extract_info(url, download=True)
@@ -327,9 +426,23 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
                     ydl_opts['format'] = 'bestaudio/best'
                 else:
                     ydl_opts['format'] = '18/best[acodec!=none]/best/b'
-                with yt_dlp.YoutubeDL(ydl_opts) as retry_ydl:
-                    info = retry_ydl.extract_info(url, download=True)
-            else:
+                try:
+                    with yt_dlp.YoutubeDL(ydl_opts) as retry_ydl:
+                        info = retry_ydl.extract_info(url, download=True)
+                except Exception:
+                    pass
+
+            # If yt-dlp failed completely on YouTube, attempt direct Invidious stream download
+            if not info and detect_platform(url) == "YouTube":
+                yt_fallback = download_youtube_fallback(url, req_id)
+                if yt_fallback:
+                    return yt_fallback
+
+            if not info:
+                if detect_platform(url) == "YouTube":
+                    yt_fallback = download_youtube_fallback(url, req_id)
+                    if yt_fallback:
+                        return yt_fallback
                 raise e
 
         filename = ydl.prepare_filename(info)
@@ -356,6 +469,10 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
                     break
 
         if not os.path.exists(filename):
+            if detect_platform(url) == "YouTube":
+                yt_fallback = download_youtube_fallback(url, req_id)
+                if yt_fallback:
+                    return yt_fallback
             raise FileNotFoundError("Downloaded file could not be located.")
 
         clean_name = os.path.basename(filename)
