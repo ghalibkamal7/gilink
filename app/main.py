@@ -421,8 +421,14 @@ async def trigger_download(
 
         media_type = "audio/mpeg" if is_audio else "video/mp4"
 
+        import urllib.parse
+        safe_ascii_filename = re.sub(r'[^\x20-\x7E]', '_', filename).replace('"', '').replace(';', '')
+        if not safe_ascii_filename.strip():
+            safe_ascii_filename = "media_download.mp4"
+        encoded_filename = urllib.parse.quote(filename)
+
         headers = {
-            "Content-Disposition": f'attachment; filename="{filename}"'
+            "Content-Disposition": f'attachment; filename="{safe_ascii_filename}"; filename*=UTF-8\'\'{encoded_filename}'
         }
         if filesize > 0:
             headers["Content-Length"] = str(filesize)

@@ -91,9 +91,12 @@ def get_cookies_filepath() -> Optional[str]:
     return None
 
 def sanitize_filename(name: str) -> str:
-    """Sanitize string to be safe for filenames."""
-    clean = re.sub(r'[\\/*?:"<>|]', "", name)
-    return clean[:80].strip() or "media_download"
+    """Sanitize string to be safe for filenames and Latin-1 HTTP response headers."""
+    clean = re.sub(r'[^\w\s.-]', '_', name)
+    clean = clean.encode('ascii', 'ignore').decode('ascii')
+    clean = re.sub(r'\s+', '_', clean)
+    clean = re.sub(r'_+', '_', clean).strip('_')
+    return clean[:60] or "media_download"
 
 def detect_platform(url: str) -> str:
     url_lower = url.lower()
