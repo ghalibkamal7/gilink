@@ -20,17 +20,63 @@ def has_ffmpeg() -> bool:
     """Check if ffmpeg is available in system PATH."""
     return shutil.which("ffmpeg") is not None
 
+def parse_cookie_data(raw: str, default_domain: str = ".youtube.com") -> List[str]:
+    """Parse cookie string (either full Netscape format or key=value header format) into Netscape lines."""
+    lines: List[str] = []
+    raw_lines = raw.strip().splitlines()
+    has_netscape_header = any("Netscape HTTP Cookie File" in l for l in raw_lines)
+    has_tabs = any("\t" in l for l in raw_lines if not l.strip().startswith("#"))
+
+    if has_netscape_header or has_tabs:
+        for line in raw_lines:
+            l = line.strip()
+            if l and not l.startswith("#"):
+                lines.append(l)
+    else:
+        # Header string: name=value; name2=value2
+        tokens = []
+        for line in raw_lines:
+            for part in line.split(";"):
+                p = part.strip()
+                if "=" in p:
+                    lower = p.lower()
+                    if not lower.startswith("path=") and not lower.startswith("domain=") and not lower.startswith("expires="):
+                        tokens.append(p)
+        for token in tokens:
+            if "=" in token:
+                name, val = token.split("=", 1)
+                name, val = name.strip(), val.strip()
+                if name and val:
+                    lines.append(f"{default_domain}\tTRUE\t/\tFALSE\t2147483647\t{name}\t{val}")
+    return lines
+
 def get_cookies_filepath() -> Optional[str]:
+    """Retrieve cookies for platforms that require them (Instagram, YouTube, etc.).
+    Combines cookies from YOUTUBE_COOKIES, INSTAGRAM_COOKIES, and COOKIES_TXT.
     """
-    Checks for Instagram/Social cookies from Environment Variable or local file.
-    Writes env var content to /tmp/cookies.txt if present.
-    """
-    env_cookies = os.environ.get("INSTAGRAM_COOKIES") or os.environ.get("YOUTUBE_COOKIES") or os.environ.get("COOKIES_TXT")
-    if env_cookies and env_cookies.strip():
+    all_cookie_lines: List[str] = []
+
+    # 1. YouTube cookies
+    yt_c = os.environ.get("YOUTUBE_COOKIES")
+    if yt_c and yt_c.strip():
+        all_cookie_lines.extend(parse_cookie_data(yt_c.strip(), default_domain=".youtube.com"))
+
+    # 2. Instagram cookies
+    ig_c = os.environ.get("INSTAGRAM_COOKIES")
+    if ig_c and ig_c.strip():
+        all_cookie_lines.extend(parse_cookie_data(ig_c.strip(), default_domain=".instagram.com"))
+
+    # 3. Generic cookies
+    gen_c = os.environ.get("COOKIES_TXT")
+    if gen_c and gen_c.strip():
+        all_cookie_lines.extend(parse_cookie_data(gen_c.strip(), default_domain=".youtube.com"))
+
+    if all_cookie_lines:
         cookie_path = os.path.join(tempfile.gettempdir(), "omnidrop_cookies.txt")
         try:
             with open(cookie_path, "w", encoding="utf-8") as f:
-                f.write(env_cookies.strip())
+                f.write("# Netscape HTTP Cookie File\n")
+                f.write("\n".join(all_cookie_lines) + "\n")
             return cookie_path
         except Exception as e:
             print(f"Error writing cookies file: {e}")
@@ -102,10 +148,14 @@ def get_media_info(url: str) -> Dict[str, Any]:
         }
     }
 
-    # Pass cookies if available (required for Instagram on cloud datacenters)
+    # Pass cookies if available (required for Instagram/YouTube on cloud datacenters)
     cookie_file = get_cookies_filepath()
     if cookie_file:
         ydl_opts['cookiefile'] = cookie_file
+
+    proxy = os.environ.get("YOUTUBE_PROXY") or os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
+    if proxy and proxy.strip():
+        ydl_opts['proxy'] = proxy.strip()
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
@@ -114,6 +164,8 @@ def get_media_info(url: str) -> Dict[str, Any]:
             err_msg = str(e)
             if "Instagram sent an empty media response" in err_msg and not cookie_file:
                 raise ValueError("Instagram requires cookies on cloud server. Please configure INSTAGRAM_COOKIES in Vercel environment variables.")
+            if ("Sign in to confirm you’re not a bot" in err_msg or "Sign in to confirm" in err_msg):
+                raise ValueError("YouTube Bot Protection triggered on cloud server. Please export cookies from YouTube, set YOUTUBE_COOKIES in Vercel Environment Variables, and Redeploy in Vercel.")
             raise ValueError(f"Media fetch failed: {err_msg}")
 
         if not info:
@@ -227,6 +279,10 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
     cookie_file = get_cookies_filepath()
     if cookie_file:
         ydl_opts['cookiefile'] = cookie_file
+
+    proxy = os.environ.get("YOUTUBE_PROXY") or os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
+    if proxy and proxy.strip():
+        ydl_opts['proxy'] = proxy.strip()
 
     ffmpeg_available = has_ffmpeg()
 
