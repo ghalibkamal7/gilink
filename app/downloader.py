@@ -184,8 +184,8 @@ def extract_youtube_fallback(url: str) -> Optional[Dict[str, Any]]:
             continue
     return None
 
-def download_youtube_fallback(url: str, req_id: str) -> Optional[Dict[str, Any]]:
-    """Fallback YouTube stream downloader if cloud datacenter IPs are blocked."""
+def download_youtube_fallback(url: str, req_id: str, is_audio: bool = False) -> Optional[Dict[str, Any]]:
+    """Fallback YouTube stream downloader with progressive stream support & audio/video muxing."""
     vid_match = re.search(r'(?:v=|\/|youtu\.be\/|shorts\/)([0-9A-Za-z_-]{11})', url)
     if not vid_match:
         return None
@@ -197,27 +197,78 @@ def download_youtube_fallback(url: str, req_id: str) -> Optional[Dict[str, Any]]
     ]
     for inst in instances:
         try:
-            r = requests.get(f'{inst}/api/v1/videos/{video_id}', timeout=4)
+            r = requests.get(f'{inst}/api/v1/videos/{video_id}', timeout=5)
             if r.status_code == 200:
                 data = r.json()
-                title = data.get('title') or "YouTube_Media"
+                title = sanitize_filename(data.get('title') or "YouTube_Media")
                 streams = data.get('formatStreams') or []
-                if streams:
+                adaptive = data.get('adaptiveFormats') or []
+
+                # 1. Audio-only download
+                if is_audio:
+                    a_url = next((a.get('url') for a in adaptive if 'audio/mp4' in a.get('type', '') and a.get('url')), None)
+                    if not a_url:
+                        a_url = next((a.get('url') for a in adaptive if 'audio/' in a.get('type', '') and a.get('url')), None)
+                    if a_url:
+                        target = os.path.join(DOWNLOAD_DIR, f'{req_id}_{title}.mp3')
+                        with requests.get(a_url, stream=True, timeout=25) as resp:
+                            if resp.status_code == 200:
+                                with open(target, 'wb') as f:
+                                    for chunk in resp.iter_content(chunk_size=64 * 1024):
+                                        if chunk:
+                                            f.write(chunk)
+                                return {'filepath': target, 'filename': f'{title}.mp3', 'filesize': os.path.getsize(target)}
+
+                # 2. Progressive stream (single file with video + audio)
+                if streams and not is_audio:
                     dl_url = streams[0].get('url')
                     if dl_url:
-                        safe_title = sanitize_filename(title)
-                        target_file = os.path.join(DOWNLOAD_DIR, f"{req_id}_{safe_title}.mp4")
-                        with requests.get(dl_url, stream=True, timeout=20) as resp:
+                        target = os.path.join(DOWNLOAD_DIR, f"{req_id}_{title}.mp4")
+                        with requests.get(dl_url, stream=True, timeout=25) as resp:
                             if resp.status_code == 200:
-                                with open(target_file, 'wb') as f:
+                                with open(target, 'wb') as f:
                                     for chunk in resp.iter_content(chunk_size=64 * 1024):
                                         if chunk:
                                             f.write(chunk)
                                 return {
-                                    "filepath": target_file,
-                                    "filename": f"{safe_title}.mp4",
-                                    "filesize": os.path.getsize(target_file)
+                                    "filepath": target,
+                                    "filename": f"{title}.mp4",
+                                    "filesize": os.path.getsize(target)
                                 }
+
+                # 3. Adaptive streams (separate video + audio muxed via ffmpeg)
+                if adaptive and not is_audio:
+                    v_url = next((a.get('url') for a in adaptive if 'video/mp4' in a.get('type', '') and a.get('url')), None)
+                    a_url = next((a.get('url') for a in adaptive if 'audio/mp4' in a.get('type', '') and a.get('url')), None)
+                    if v_url:
+                        target = os.path.join(DOWNLOAD_DIR, f"{req_id}_{title}.mp4")
+                        v_temp = os.path.join(DOWNLOAD_DIR, f"{req_id}_v.mp4")
+                        with requests.get(v_url, stream=True, timeout=25) as resp:
+                            with open(v_temp, 'wb') as f:
+                                for chunk in resp.iter_content(chunk_size=64 * 1024):
+                                    if chunk:
+                                        f.write(chunk)
+                        if a_url and has_ffmpeg():
+                            a_temp = os.path.join(DOWNLOAD_DIR, f"{req_id}_a.m4a")
+                            with requests.get(a_url, stream=True, timeout=25) as resp:
+                                with open(a_temp, 'wb') as f:
+                                    for chunk in resp.iter_content(chunk_size=64 * 1024):
+                                        if chunk:
+                                            f.write(chunk)
+                            try:
+                                import subprocess
+                                subprocess.run(['ffmpeg', '-y', '-i', v_temp, '-i', a_temp, '-c', 'copy', target], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                                if os.path.exists(v_temp): os.remove(v_temp)
+                                if os.path.exists(a_temp): os.remove(a_temp)
+                            except Exception:
+                                if os.path.exists(v_temp): os.rename(v_temp, target)
+                        else:
+                            os.rename(v_temp, target)
+                        return {
+                            "filepath": target,
+                            "filename": f"{title}.mp4",
+                            "filesize": os.path.getsize(target)
+                        }
         except Exception:
             continue
     return None
@@ -434,13 +485,13 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
 
             # If yt-dlp failed completely on YouTube, attempt direct Invidious stream download
             if not info and detect_platform(url) == "YouTube":
-                yt_fallback = download_youtube_fallback(url, req_id)
+                yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
                 if yt_fallback:
                     return yt_fallback
 
             if not info:
                 if detect_platform(url) == "YouTube":
-                    yt_fallback = download_youtube_fallback(url, req_id)
+                    yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
                     if yt_fallback:
                         return yt_fallback
                 raise e
@@ -470,7 +521,7 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
 
         if not os.path.exists(filename):
             if detect_platform(url) == "YouTube":
-                yt_fallback = download_youtube_fallback(url, req_id)
+                yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
                 if yt_fallback:
                     return yt_fallback
             raise FileNotFoundError("Downloaded file could not be located.")
