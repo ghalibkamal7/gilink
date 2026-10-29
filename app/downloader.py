@@ -188,8 +188,20 @@ def extract_youtube_fallback(url: str) -> Optional[Dict[str, Any]]:
             continue
     return None
 
-def get_youtube_direct_stream(url: str, is_audio: bool = False) -> Optional[Dict[str, Any]]:
-    """Return an instant streaming proxy URL for YouTube to bypass serverless payload limits and bot protection."""
+def _extract_height(stream_dict: Dict[str, Any]) -> int:
+    """Helper to extract vertical resolution integer from stream metadata."""
+    lbl = str(stream_dict.get('qualityLabel') or stream_dict.get('resolution') or '')
+    m = re.search(r'(\d+)', lbl)
+    if m:
+        return int(m.group(1))
+    size = str(stream_dict.get('size') or '')
+    m = re.search(r'x(\d+)', size)
+    if m:
+        return int(m.group(1))
+    return 0
+
+def get_youtube_direct_stream(url: str, is_audio: bool = False, format_spec: str = "best") -> Optional[Dict[str, Any]]:
+    """Return an instant streaming proxy URL for YouTube with optimal quality selection."""
     vid_match = re.search(r'(?:v=|\/|youtu\.be\/|shorts\/)([0-9A-Za-z_-]{11})', url)
     if not vid_match:
         return None
@@ -199,9 +211,20 @@ def get_youtube_direct_stream(url: str, is_audio: bool = False) -> Optional[Dict
         'https://invidious.nerdvpn.de',
         'https://inv.nadeko.net'
     ]
+
+    target_height = 9999
+    if '1080' in format_spec:
+        target_height = 1080
+    elif '720' in format_spec:
+        target_height = 720
+    elif '480' in format_spec:
+        target_height = 480
+    elif '360' in format_spec:
+        target_height = 360
+
     for inst in instances:
         try:
-            r = requests.get(f'{inst}/api/v1/videos/{video_id}', timeout=4)
+            r = requests.get(f'{inst}/api/v1/videos/{video_id}', timeout=5)
             if r.status_code == 200:
                 data = r.json()
                 title = sanitize_filename(data.get('title') or "YouTube_Media")
@@ -209,37 +232,61 @@ def get_youtube_direct_stream(url: str, is_audio: bool = False) -> Optional[Dict
                 adaptive = data.get('adaptiveFormats') or []
 
                 if is_audio:
-                    a_url = next((a.get('url') for a in adaptive if 'audio/mp4' in a.get('type', '') and a.get('url')), None)
-                    if not a_url:
-                        a_url = next((a.get('url') for a in adaptive if 'audio/' in a.get('type', '') and a.get('url')), None)
-                    if a_url:
-                        parsed = urllib.parse.urlparse(a_url)
+                    audio_candidates = [a for a in adaptive if 'audio/' in a.get('type', '') and a.get('url')]
+                    if audio_candidates:
+                        # Sort by bitrate with preference for standard mp4a AAC
+                        audio_candidates.sort(
+                            key=lambda a: int(a.get('bitrate') or 0) + (1000000 if 'audio/mp4' in a.get('type', '') else 0),
+                            reverse=True
+                        )
+                        chosen_audio = audio_candidates[0]
+                        parsed = urllib.parse.urlparse(chosen_audio['url'])
                         proxy_url = f"{inst}/videoplayback?{parsed.query}"
+                        clen = chosen_audio.get('clen')
                         return {
                             "stream_url": proxy_url,
                             "filename": f"{title}.mp3",
-                            "media_type": "audio/mpeg"
+                            "media_type": "audio/mpeg",
+                            "content_length": int(clen) if clen else None
                         }
                 else:
+                    # 1. Prefer progressive streams (pre-muxed audio & video)
                     if streams:
-                        s_url = streams[0].get('url')
+                        streams.sort(key=_extract_height, reverse=True)
+                        matching = [s for s in streams if _extract_height(s) <= target_height]
+                        chosen_stream = matching[0] if matching else streams[0]
+                        s_url = chosen_stream.get('url')
                         if s_url:
                             parsed = urllib.parse.urlparse(s_url)
                             proxy_url = f"{inst}/videoplayback?{parsed.query}"
+                            clen = chosen_stream.get('clen')
                             return {
                                 "stream_url": proxy_url,
                                 "filename": f"{title}.mp4",
-                                "media_type": "video/mp4"
+                                "media_type": "video/mp4",
+                                "content_length": int(clen) if clen else None
                             }
-                    v_url = next((a.get('url') for a in adaptive if 'video/mp4' in a.get('type', '') and a.get('url')), None)
-                    if v_url:
-                        parsed = urllib.parse.urlparse(v_url)
-                        proxy_url = f"{inst}/videoplayback?{parsed.query}"
-                        return {
-                            "stream_url": proxy_url,
-                            "filename": f"{title}.mp4",
-                            "media_type": "video/mp4"
-                        }
+
+                    # 2. Fallback to adaptive streams sorted highest-to-lowest resolution
+                    mp4_videos = [a for a in adaptive if 'video/mp4' in a.get('type', '') and a.get('url')]
+                    if not mp4_videos:
+                        mp4_videos = [a for a in adaptive if 'video/' in a.get('type', '') and a.get('url')]
+
+                    if mp4_videos:
+                        mp4_videos.sort(key=_extract_height, reverse=True)
+                        matching_adaptive = [a for a in mp4_videos if _extract_height(a) <= target_height]
+                        chosen_adaptive = matching_adaptive[0] if matching_adaptive else mp4_videos[0]
+                        v_url = chosen_adaptive.get('url')
+                        if v_url:
+                            parsed = urllib.parse.urlparse(v_url)
+                            proxy_url = f"{inst}/videoplayback?{parsed.query}"
+                            clen = chosen_adaptive.get('clen')
+                            return {
+                                "stream_url": proxy_url,
+                                "filename": f"{title}.mp4",
+                                "media_type": "video/mp4",
+                                "content_length": int(clen) if clen else None
+                            }
         except Exception:
             continue
     return None

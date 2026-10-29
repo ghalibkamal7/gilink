@@ -285,15 +285,22 @@ def get_home_html() -> str:
           </div>
 
           <!-- Action Status / Progress Bar -->
-          <div id="downloadStatus" class="hidden mt-2.5 p-2 rounded-lg bg-slate-950 border border-slate-800" role="status">
-            <div class="flex items-center justify-between text-xs text-slate-300 mb-1">
-              <span id="statusText" class="font-medium flex items-center space-x-1.5 text-indigo-300">
-                <i data-lucide="loader-2" class="w-3 h-3 animate-spin" aria-hidden="true"></i>
-                <span>Preparing download...</span>
-              </span>
-            </div>
-            <div class="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-              <div id="statusBar" class="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full w-2/3 animate-pulse"></div>
+          <div id="downloadStatus" class="hidden mt-2.5 p-3 rounded-lg bg-slate-950 border border-slate-800" role="status">
+            <div id="statusContainer">
+              <div class="flex items-center justify-between text-xs text-slate-300 mb-1.5">
+                <span id="statusText" class="font-medium flex items-center space-x-1.5 text-indigo-300">
+                  <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin" aria-hidden="true"></i>
+                  <span>Downloading media file...</span>
+                </span>
+                <span id="statusPercent" class="font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20 text-[11px] font-mono">0%</span>
+              </div>
+              <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden mb-1.5">
+                <div id="statusBar" class="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-150" style="width: 0%"></div>
+              </div>
+              <div class="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                <span id="statusBytes">0.0 MB / 0.0 MB</span>
+                <span id="statusRemaining" class="text-amber-300/90 font-medium">Connecting...</span>
+              </div>
             </div>
           </div>
 
@@ -780,7 +787,7 @@ def get_contact_html() -> str:
 # JAVASCRIPT LOGIC FOR HOMEPAGE
 # ==============================================================================
 
-HOME_SCRIPTS = """
+HOME_SCRIPTS = r"""
   <script>
   document.addEventListener('DOMContentLoaded', () => {
     const urlForm = document.getElementById('urlForm');
@@ -800,6 +807,10 @@ HOME_SCRIPTS = """
     const formatPresets = document.getElementById('formatPresets');
     const downloadStatus = document.getElementById('downloadStatus');
     const statusText = document.getElementById('statusText');
+    const statusPercent = document.getElementById('statusPercent');
+    const statusBar = document.getElementById('statusBar');
+    const statusBytes = document.getElementById('statusBytes');
+    const statusRemaining = document.getElementById('statusRemaining');
     const historyBtn = document.getElementById('historyBtn');
     const historyModal = document.getElementById('historyModal');
     const closeHistoryBtn = document.getElementById('closeHistoryBtn');
@@ -870,7 +881,14 @@ HOME_SCRIPTS = """
 
     const startDownload = async (url, formatSpec, isAudio) => {
       downloadStatus.classList.remove('hidden');
-      statusText.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Downloading media file...</span>`;
+      if (statusPercent) statusPercent.textContent = '0%';
+      if (statusBar) {
+        statusBar.style.width = '0%';
+        statusBar.className = 'h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-150';
+      }
+      if (statusBytes) statusBytes.textContent = '0.0 MB / ...';
+      if (statusRemaining) statusRemaining.textContent = 'Connecting...';
+      statusText.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Requesting media stream...</span>`;
       if (typeof lucide !== 'undefined') lucide.createIcons();
 
       const dlUrl = `/api/download?url=${encodeURIComponent(url)}&format_spec=${encodeURIComponent(formatSpec)}&is_audio=${isAudio}`;
@@ -882,16 +900,59 @@ HOME_SCRIPTS = """
           throw new Error(errData.detail || 'Download request failed (' + res.status + ')');
         }
 
-        let filename = 'media_download.mp4';
+        const clHeader = res.headers.get('content-length');
+        const totalBytes = clHeader ? parseInt(clHeader, 10) : 0;
+
+        let filename = isAudio ? 'audio_download.mp3' : 'media_download.mp4';
         const disposition = res.headers.get('content-disposition');
-        if (disposition && disposition.indexOf('filename=') !== -1) {
-          const matches = /filename[^;=\\n]*=((['"]).*?\\2|[^;\\n]*)/.exec(disposition);
-          if (matches != null && matches[1]) {
-            filename = matches[1].replace(/['"]/g, '');
+        if (disposition) {
+          const rfc5987 = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
+          if (rfc5987 && rfc5987[1]) {
+            filename = decodeURIComponent(rfc5987[1]);
+          } else {
+            const standard = /filename="?([^";]+)"?/i.exec(disposition);
+            if (standard && standard[1]) {
+              filename = standard[1];
+            }
           }
         }
 
-        const blob = await res.blob();
+        statusText.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Downloading media file...</span>`;
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
+        const reader = res.body.getReader();
+        const chunks = [];
+        let receivedBytes = 0;
+        const formatMB = (b) => (b / (1024 * 1024)).toFixed(1);
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+          receivedBytes += value.length;
+
+          const recMB = formatMB(receivedBytes);
+          if (totalBytes > 0) {
+            const pct = Math.min(100, Math.round((receivedBytes / totalBytes) * 100));
+            const totMB = formatMB(totalBytes);
+            const remMB = formatMB(Math.max(0, totalBytes - receivedBytes));
+
+            if (statusPercent) statusPercent.textContent = `${pct}%`;
+            if (statusBar) statusBar.style.width = `${pct}%`;
+            if (statusBytes) statusBytes.textContent = `${recMB} MB / ${totMB} MB`;
+            if (statusRemaining) statusRemaining.textContent = `${remMB} MB remaining`;
+          } else {
+            if (statusPercent) statusPercent.textContent = `${recMB} MB`;
+            if (statusBar) {
+              statusBar.style.width = '65%';
+              if (!statusBar.classList.contains('animate-pulse')) statusBar.classList.add('animate-pulse');
+            }
+            if (statusBytes) statusBytes.textContent = `${recMB} MB downloaded`;
+            if (statusRemaining) statusRemaining.textContent = 'Streaming...';
+          }
+        }
+
+        const blob = new Blob(chunks, { type: isAudio ? 'audio/mpeg' : 'video/mp4' });
         const blobUrl = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.style.display = 'none';
@@ -902,11 +963,24 @@ HOME_SCRIPTS = """
         window.URL.revokeObjectURL(blobUrl);
         a.remove();
 
-        statusText.innerHTML = `<i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400"></i><span class="text-emerald-400">Download complete!</span>`;
+        if (statusPercent) statusPercent.textContent = '100%';
+        if (statusBar) {
+          statusBar.style.width = '100%';
+          statusBar.classList.remove('animate-pulse');
+        }
+        if (statusRemaining) statusRemaining.textContent = 'Saved to device';
+        statusText.innerHTML = `<i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400"></i><span class="text-emerald-400 font-semibold">Download complete!</span>`;
         if (typeof lucide !== 'undefined') lucide.createIcons();
-        setTimeout(() => downloadStatus.classList.add('hidden'), 4000);
+        setTimeout(() => downloadStatus.classList.add('hidden'), 4500);
       } catch (err) {
-        statusText.innerHTML = `<i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-red-400"></i><span class="text-red-400">${err.message}</span>`;
+        if (statusPercent) statusPercent.textContent = 'Error';
+        if (statusBar) {
+          statusBar.style.width = '100%';
+          statusBar.classList.remove('animate-pulse');
+          statusBar.className = 'h-full bg-red-500 rounded-full';
+        }
+        if (statusRemaining) statusRemaining.textContent = '';
+        statusText.innerHTML = `<i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-red-400"></i><span class="text-red-400 font-semibold">${err.message}</span>`;
         if (typeof lucide !== 'undefined') lucide.createIcons();
       }
     };
