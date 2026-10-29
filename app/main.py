@@ -3,7 +3,7 @@ import re
 import urllib.parse
 from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException, Query
-from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, JSONResponse, Response
 from starlette.background import BackgroundTask
 from pydantic import BaseModel
 
@@ -405,6 +405,15 @@ async def fetch_info(req: InfoRequest):
     except Exception as e:
         return JSONResponse(status_code=400, content={"success": False, "error": str(e)})
 
+def file_iterator(file_path: str, chunk_size: int = 64 * 1024):
+    """Yield file chunks to bypass serverless response payload limits and clean up upon completion."""
+    try:
+        with open(file_path, "rb") as f:
+            while chunk := f.read(chunk_size):
+                yield chunk
+    finally:
+        remove_temp_file(file_path)
+
 @app.get("/api/download")
 async def trigger_download(
     url: str = Query(...),
@@ -434,12 +443,10 @@ async def trigger_download(
         if filesize > 0:
             headers["Content-Length"] = str(filesize)
 
-        return FileResponse(
-            path=filepath,
-            filename=filename,
+        return StreamingResponse(
+            file_iterator(filepath),
             media_type=media_type,
-            headers=headers,
-            background=BackgroundTask(remove_temp_file, filepath)
+            headers=headers
         )
     except Exception as e:
         err_msg = str(e)

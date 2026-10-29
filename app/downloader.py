@@ -220,7 +220,11 @@ def download_youtube_fallback(url: str, req_id: str, is_audio: bool = False) -> 
                                     for chunk in resp.iter_content(chunk_size=64 * 1024):
                                         if chunk:
                                             f.write(chunk)
-                                return {'filepath': target, 'filename': f'{title}.mp3', 'filesize': os.path.getsize(target)}
+                                if os.path.exists(target) and os.path.getsize(target) > 0:
+                                    return {'filepath': target, 'filename': f'{title}.mp3', 'filesize': os.path.getsize(target)}
+                                else:
+                                    try: os.remove(target)
+                                    except Exception: pass
 
                 # 2. Progressive stream (single file with video + audio)
                 if streams and not is_audio:
@@ -233,11 +237,15 @@ def download_youtube_fallback(url: str, req_id: str, is_audio: bool = False) -> 
                                     for chunk in resp.iter_content(chunk_size=64 * 1024):
                                         if chunk:
                                             f.write(chunk)
-                                return {
-                                    "filepath": target,
-                                    "filename": f"{title}.mp4",
-                                    "filesize": os.path.getsize(target)
-                                }
+                                if os.path.exists(target) and os.path.getsize(target) > 0:
+                                    return {
+                                        "filepath": target,
+                                        "filename": f"{title}.mp4",
+                                        "filesize": os.path.getsize(target)
+                                    }
+                                else:
+                                    try: os.remove(target)
+                                    except Exception: pass
 
                 # 3. Adaptive streams (separate video + audio muxed via ffmpeg)
                 if adaptive and not is_audio:
@@ -247,17 +255,19 @@ def download_youtube_fallback(url: str, req_id: str, is_audio: bool = False) -> 
                         target = os.path.join(DOWNLOAD_DIR, f"{req_id}_{title}.mp4")
                         v_temp = os.path.join(DOWNLOAD_DIR, f"{req_id}_v.mp4")
                         with requests.get(v_url, stream=True, timeout=25) as resp:
-                            with open(v_temp, 'wb') as f:
-                                for chunk in resp.iter_content(chunk_size=64 * 1024):
-                                    if chunk:
-                                        f.write(chunk)
-                        if a_url and has_ffmpeg():
-                            a_temp = os.path.join(DOWNLOAD_DIR, f"{req_id}_a.m4a")
-                            with requests.get(a_url, stream=True, timeout=25) as resp:
-                                with open(a_temp, 'wb') as f:
+                            if resp.status_code == 200:
+                                with open(v_temp, 'wb') as f:
                                     for chunk in resp.iter_content(chunk_size=64 * 1024):
                                         if chunk:
                                             f.write(chunk)
+                        if a_url and has_ffmpeg():
+                            a_temp = os.path.join(DOWNLOAD_DIR, f"{req_id}_a.m4a")
+                            with requests.get(a_url, stream=True, timeout=25) as resp:
+                                if resp.status_code == 200:
+                                    with open(a_temp, 'wb') as f:
+                                        for chunk in resp.iter_content(chunk_size=64 * 1024):
+                                            if chunk:
+                                                f.write(chunk)
                             try:
                                 import subprocess
                                 subprocess.run(['ffmpeg', '-y', '-i', v_temp, '-i', a_temp, '-c', 'copy', target], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -266,12 +276,21 @@ def download_youtube_fallback(url: str, req_id: str, is_audio: bool = False) -> 
                             except Exception:
                                 if os.path.exists(v_temp): os.rename(v_temp, target)
                         else:
-                            os.rename(v_temp, target)
-                        return {
-                            "filepath": target,
-                            "filename": f"{title}.mp4",
-                            "filesize": os.path.getsize(target)
-                        }
+                            if os.path.exists(v_temp):
+                                os.rename(v_temp, target)
+                        if os.path.exists(target) and os.path.getsize(target) > 0:
+                            return {
+                                "filepath": target,
+                                "filename": f"{title}.mp4",
+                                "filesize": os.path.getsize(target)
+                            }
+                        else:
+                            if os.path.exists(target):
+                                try: os.remove(target)
+                                except Exception: pass
+                            if os.path.exists(v_temp):
+                                try: os.remove(v_temp)
+                                except Exception: pass
         except Exception:
             continue
     return None
@@ -515,19 +534,20 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
             if os.path.exists(mp4_candidate):
                 filename = mp4_candidate
 
-        if not os.path.exists(filename):
-            # Scan directory for matching file with req_id
+        if not os.path.exists(filename) or os.path.getsize(filename) == 0:
+            # Scan directory for matching valid file with req_id
             for f in os.listdir(DOWNLOAD_DIR):
-                if f.startswith(req_id):
-                    filename = os.path.join(DOWNLOAD_DIR, f)
+                cand = os.path.join(DOWNLOAD_DIR, f)
+                if f.startswith(req_id) and os.path.exists(cand) and os.path.getsize(cand) > 0 and not f.endswith(".part"):
+                    filename = cand
                     break
 
-        if not os.path.exists(filename):
+        if not os.path.exists(filename) or os.path.getsize(filename) == 0:
             if detect_platform(url) == "YouTube":
                 yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
-                if yt_fallback:
+                if yt_fallback and os.path.exists(yt_fallback["filepath"]) and os.path.getsize(yt_fallback["filepath"]) > 0:
                     return yt_fallback
-            raise FileNotFoundError("Downloaded file could not be located.")
+            raise FileNotFoundError("Downloaded media file could not be located or is empty.")
 
         clean_name = os.path.basename(filename)
         # Strip req_id prefix from downloaded filename for user-friendly name
