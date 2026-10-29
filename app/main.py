@@ -1,7 +1,8 @@
 import os
 from pathlib import Path
-from fastapi import FastAPI, Request, HTTPException, BackgroundTasks, Query
+from fastapi import FastAPI, Request, HTTPException, Query
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, Response
+from starlette.background import BackgroundTask
 from pydantic import BaseModel
 
 try:
@@ -404,7 +405,6 @@ async def fetch_info(req: InfoRequest):
 
 @app.get("/api/download")
 async def trigger_download(
-    background_tasks: BackgroundTasks,
     url: str = Query(...),
     format_spec: str = Query("best"),
     is_audio: bool = Query(False)
@@ -417,15 +417,22 @@ async def trigger_download(
         result = download_media(url, format_spec, is_audio)
         filepath = result["filepath"]
         filename = result["filename"]
+        filesize = result.get("filesize") or (os.path.getsize(filepath) if os.path.exists(filepath) else 0)
 
-        # Schedule automatic cleanup of downloaded media after sending
-        background_tasks.add_task(remove_temp_file, filepath)
+        media_type = "audio/mpeg" if is_audio else "video/mp4"
+
+        headers = {
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+        if filesize > 0:
+            headers["Content-Length"] = str(filesize)
 
         return FileResponse(
             path=filepath,
             filename=filename,
-            media_type="application/octet-stream",
-            headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+            media_type=media_type,
+            headers=headers,
+            background=BackgroundTask(remove_temp_file, filepath)
         )
     except Exception as e:
         err_msg = str(e)
