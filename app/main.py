@@ -1,4 +1,6 @@
 import os
+import re
+import urllib.parse
 from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException, Query
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, Response
@@ -421,7 +423,6 @@ async def trigger_download(
 
         media_type = "audio/mpeg" if is_audio else "video/mp4"
 
-        import urllib.parse
         safe_ascii_filename = re.sub(r'[^\x20-\x7E]', '_', filename).replace('"', '').replace(';', '')
         if not safe_ascii_filename.strip():
             safe_ascii_filename = "media_download.mp4"
