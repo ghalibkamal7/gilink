@@ -6,6 +6,12 @@ import shutil
 from typing import Dict, Any, List, Optional
 import yt_dlp
 
+try:
+    import static_ffmpeg
+    static_ffmpeg.add_paths()
+except Exception:
+    pass
+
 # Use /tmp for downloads (works on Vercel's read-only filesystem)
 DOWNLOAD_DIR = os.path.join(tempfile.gettempdir(), "omnidrop_downloads")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
@@ -19,7 +25,7 @@ def get_cookies_filepath() -> Optional[str]:
     Checks for Instagram/Social cookies from Environment Variable or local file.
     Writes env var content to /tmp/cookies.txt if present.
     """
-    env_cookies = os.environ.get("INSTAGRAM_COOKIES") or os.environ.get("COOKIES_TXT")
+    env_cookies = os.environ.get("INSTAGRAM_COOKIES") or os.environ.get("YOUTUBE_COOKIES") or os.environ.get("COOKIES_TXT")
     if env_cookies and env_cookies.strip():
         cookie_path = os.path.join(tempfile.gettempdir(), "omnidrop_cookies.txt")
         try:
@@ -89,6 +95,11 @@ def get_media_info(url: str) -> Dict[str, Any]:
         'no_warnings': True,
         'skip_download': True,
         'extract_flat': False,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'web']
+            }
+        }
     }
 
     # Pass cookies if available (required for Instagram on cloud datacenters)
@@ -205,6 +216,11 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
         'quiet': False,
         'no_warnings': True,
         'restrictfilenames': True,
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'web']
+            }
+        }
     }
 
     # Pass cookies if available
@@ -231,21 +247,30 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
             ydl_opts['format'] = format_spec
             ydl_opts['merge_output_format'] = 'mp4'
         else:
-            # Fallback to standalone single stream format (does not require ffmpeg merge)
+            # Fallback to single stream with progressive audio+video fallback
             clean_format = format_spec.replace("bestvideo+bestaudio/", "")
-            if "+" in clean_format:
-                clean_format = "best"
-            ydl_opts['format'] = clean_format or 'best'
+            if "+" in clean_format or clean_format == "best":
+                # Prefer progressive streams containing both audio and video (format 18 is YouTube's reliable standard)
+                ydl_opts['format'] = 'best[vcodec!=none][acodec!=none]/18/best/b'
+            elif "height<=720" in clean_format:
+                ydl_opts['format'] = 'best[height<=720][acodec!=none]/18/best[acodec!=none]/best'
+            elif "height<=480" in clean_format:
+                ydl_opts['format'] = 'best[height<=480][acodec!=none]/18/best[acodec!=none]/best'
+            else:
+                ydl_opts['format'] = f"{clean_format}/best[acodec!=none]/18/best/b"
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         try:
             info = ydl.extract_info(url, download=True)
         except Exception as e:
-            # If specified format failed (e.g. ffmpeg missing error), retry with safest 'best'
+            # If specified format failed (e.g. ffmpeg missing error), retry with safest progressive format
             if "ffmpeg" in str(e).lower() or "merge" in str(e).lower() or "requested format" in str(e).lower():
                 ydl_opts.pop('merge_output_format', None)
                 ydl_opts.pop('postprocessors', None)
-                ydl_opts['format'] = 'best'
+                if is_audio:
+                    ydl_opts['format'] = 'bestaudio/best'
+                else:
+                    ydl_opts['format'] = '18/best[acodec!=none]/best/b'
                 with yt_dlp.YoutubeDL(ydl_opts) as retry_ydl:
                     info = retry_ydl.extract_info(url, download=True)
             else:
