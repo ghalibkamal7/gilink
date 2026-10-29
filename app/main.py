@@ -8,9 +8,9 @@ from starlette.background import BackgroundTask
 from pydantic import BaseModel
 
 try:
-    from .downloader import get_media_info, download_media
+    from .downloader import get_media_info, download_media, get_youtube_direct_stream, detect_platform
 except ImportError:
-    from downloader import get_media_info, download_media
+    from downloader import get_media_info, download_media, get_youtube_direct_stream, detect_platform
 
 try:
     from .icons import get_icon_bytes
@@ -405,6 +405,14 @@ async def fetch_info(req: InfoRequest):
     except Exception as e:
         return JSONResponse(status_code=400, content={"success": False, "error": str(e)})
 
+def stream_remote(proxy_url: str):
+    """Stream chunks directly from proxied media pipeline to eliminate memory and disk overhead."""
+    import requests
+    with requests.get(proxy_url, stream=True, timeout=60) as resp:
+        for chunk in resp.iter_content(chunk_size=64 * 1024):
+            if chunk:
+                yield chunk
+
 def file_iterator(file_path: str, chunk_size: int = 64 * 1024):
     """Yield file chunks to bypass serverless response payload limits and clean up upon completion."""
     try:
@@ -423,6 +431,21 @@ async def trigger_download(
     url = url.strip()
     if not url:
         raise HTTPException(status_code=400, detail="Invalid URL")
+
+    # Fast direct streaming proxy for YouTube to bypass datacenter IP restrictions
+    if detect_platform(url) == "YouTube":
+        direct = get_youtube_direct_stream(url, is_audio=is_audio)
+        if direct:
+            safe_ascii = re.sub(r'[^\x20-\x7E]', '_', direct["filename"]).replace('"', '').replace(';', '')
+            encoded_fn = urllib.parse.quote(direct["filename"])
+            headers = {
+                "Content-Disposition": f'attachment; filename="{safe_ascii}"; filename*=UTF-8\'\'{encoded_fn}'
+            }
+            return StreamingResponse(
+                stream_remote(direct["stream_url"]),
+                media_type=direct["media_type"],
+                headers=headers
+            )
 
     try:
         result = download_media(url, format_spec, is_audio)
@@ -449,6 +472,21 @@ async def trigger_download(
             headers=headers
         )
     except Exception as e:
+        # Final safety net for YouTube if bot detection still triggers
+        if detect_platform(url) == "YouTube":
+            direct = get_youtube_direct_stream(url, is_audio=is_audio)
+            if direct:
+                safe_ascii = re.sub(r'[^\x20-\x7E]', '_', direct["filename"]).replace('"', '').replace(';', '')
+                encoded_fn = urllib.parse.quote(direct["filename"])
+                headers = {
+                    "Content-Disposition": f'attachment; filename="{safe_ascii}"; filename*=UTF-8\'\'{encoded_fn}'
+                }
+                return StreamingResponse(
+                    stream_remote(direct["stream_url"]),
+                    media_type=direct["media_type"],
+                    headers=headers
+                )
+
         err_msg = str(e)
         if "Sign in to confirm you’re not a bot" in err_msg or "Sign in to confirm" in err_msg:
             raise HTTPException(

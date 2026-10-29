@@ -3,6 +3,7 @@ import re
 import uuid
 import tempfile
 import shutil
+import urllib.parse
 from typing import Dict, Any, List, Optional
 import requests
 import yt_dlp
@@ -183,6 +184,62 @@ def extract_youtube_fallback(url: str) -> Optional[Dict[str, Any]]:
                         {"id": "bestaudio", "quality": "128 kbps", "ext": "mp3", "size": "Auto", "type": "audio"}
                     ]
                 }
+        except Exception:
+            continue
+    return None
+
+def get_youtube_direct_stream(url: str, is_audio: bool = False) -> Optional[Dict[str, Any]]:
+    """Return an instant streaming proxy URL for YouTube to bypass serverless payload limits and bot protection."""
+    vid_match = re.search(r'(?:v=|\/|youtu\.be\/|shorts\/)([0-9A-Za-z_-]{11})', url)
+    if not vid_match:
+        return None
+    video_id = vid_match.group(1)
+    instances = [
+        'https://yt.chocolatemoo53.com',
+        'https://invidious.nerdvpn.de',
+        'https://inv.nadeko.net'
+    ]
+    for inst in instances:
+        try:
+            r = requests.get(f'{inst}/api/v1/videos/{video_id}', timeout=4)
+            if r.status_code == 200:
+                data = r.json()
+                title = sanitize_filename(data.get('title') or "YouTube_Media")
+                streams = data.get('formatStreams') or []
+                adaptive = data.get('adaptiveFormats') or []
+
+                if is_audio:
+                    a_url = next((a.get('url') for a in adaptive if 'audio/mp4' in a.get('type', '') and a.get('url')), None)
+                    if not a_url:
+                        a_url = next((a.get('url') for a in adaptive if 'audio/' in a.get('type', '') and a.get('url')), None)
+                    if a_url:
+                        parsed = urllib.parse.urlparse(a_url)
+                        proxy_url = f"{inst}/videoplayback?{parsed.query}"
+                        return {
+                            "stream_url": proxy_url,
+                            "filename": f"{title}.mp3",
+                            "media_type": "audio/mpeg"
+                        }
+                else:
+                    if streams:
+                        s_url = streams[0].get('url')
+                        if s_url:
+                            parsed = urllib.parse.urlparse(s_url)
+                            proxy_url = f"{inst}/videoplayback?{parsed.query}"
+                            return {
+                                "stream_url": proxy_url,
+                                "filename": f"{title}.mp4",
+                                "media_type": "video/mp4"
+                            }
+                    v_url = next((a.get('url') for a in adaptive if 'video/mp4' in a.get('type', '') and a.get('url')), None)
+                    if v_url:
+                        parsed = urllib.parse.urlparse(v_url)
+                        proxy_url = f"{inst}/videoplayback?{parsed.query}"
+                        return {
+                            "stream_url": proxy_url,
+                            "filename": f"{title}.mp4",
+                            "media_type": "video/mp4"
+                        }
         except Exception:
             continue
     return None
