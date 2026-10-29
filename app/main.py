@@ -428,6 +428,12 @@ async def trigger_download(
             headers={"Content-Disposition": f'attachment; filename="{filename}"'}
         )
     except Exception as e:
+        err_msg = str(e)
+        if "Sign in to confirm you’re not a bot" in err_msg or "Sign in to confirm" in err_msg:
+            raise HTTPException(
+                status_code=403,
+                detail="YouTube has blocked this cloud server IP (Bot Protection). To fix this, export cookies from YouTube and set YOUTUBE_COOKIES in Vercel Environment Variables, exactly like Instagram cookies."
+            )
         raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
 
 @app.get("/api/health")
