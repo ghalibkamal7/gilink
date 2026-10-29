@@ -459,4 +459,21 @@ async def trigger_download(
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "app": "GI LINK Media Downloader", "version": "1.1.0"}
+    yt_c = os.environ.get("YOUTUBE_COOKIES") or ""
+    ig_c = os.environ.get("INSTAGRAM_COOKIES") or ""
+    from .downloader import get_cookies_filepath
+    ck_path = get_cookies_filepath()
+    ck_lines = 0
+    if ck_path and os.path.exists(ck_path):
+        with open(ck_path, "r", encoding="utf-8") as f:
+            ck_lines = len(f.readlines())
+    return {
+        "status": "ok",
+        "app": "GI LINK Media Downloader",
+        "version": "1.1.0",
+        "yt_cookies_configured": bool(yt_c.strip()),
+        "yt_cookies_char_length": len(yt_c.strip()),
+        "ig_cookies_configured": bool(ig_c.strip()),
+        "cookie_file_active": bool(ck_path),
+        "cookie_lines_parsed": ck_lines
+    }
