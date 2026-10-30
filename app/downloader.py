@@ -164,10 +164,9 @@ def extract_youtube_fallback(url: str) -> Optional[Dict[str, Any]]:
                     thumbnail = f"https://i.ytimg.com{thumbnail}"
                 
                 presets = [
-                    {"id": "best", "name": "Best Quality (HD)", "ext": "mp4", "badge": "Fast"},
-                    {"id": "best[height<=720]/best", "name": "720p HD", "ext": "mp4", "badge": "720p"},
-                    {"id": "best[height<=480]/best", "name": "480p SD", "ext": "mp4", "badge": "480p"},
-                    {"id": "bestaudio/best", "name": "Audio Only", "ext": "mp3", "badge": "Audio"}
+                    {"id": "best", "name": "Best Quality (Video + Audio)", "ext": "mp4", "badge": "Full"},
+                    {"id": "18", "name": "Standard (360p + Audio)", "ext": "mp4", "badge": "Fast"},
+                    {"id": "bestaudio/best", "name": "Audio Only (MP3)", "ext": "mp3", "badge": "Audio"}
                 ]
                 return {
                     "title": title,
@@ -178,7 +177,7 @@ def extract_youtube_fallback(url: str) -> Optional[Dict[str, Any]]:
                     "url": url,
                     "presets": presets,
                     "formats": [
-                        {"id": "best", "quality": "HD (720p/360p)", "height": 720, "ext": "mp4", "size": "Auto", "type": "video"}
+                        {"id": "best", "quality": "HD (Video + Audio)", "height": 720, "ext": "mp4", "size": "Auto", "type": "video"}
                     ],
                     "audio_formats": [
                         {"id": "bestaudio", "quality": "128 kbps", "ext": "mp3", "size": "Auto", "type": "audio"}
@@ -197,10 +196,9 @@ def extract_youtube_fallback(url: str) -> Optional[Dict[str, Any]]:
             uploader = oe_data.get("author_name") or "YouTube Creator"
             thumbnail = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
             presets = [
-                {"id": "best", "name": "Best Quality (HD)", "ext": "mp4", "badge": "Fast"},
-                {"id": "best[height<=720]/best", "name": "720p HD", "ext": "mp4", "badge": "720p"},
-                {"id": "best[height<=480]/best", "name": "480p SD", "ext": "mp4", "badge": "480p"},
-                {"id": "bestaudio/best", "name": "Audio Only", "ext": "mp3", "badge": "Audio"}
+                {"id": "best", "name": "Best Quality (Video + Audio)", "ext": "mp4", "badge": "Full"},
+                {"id": "18", "name": "Standard (360p + Audio)", "ext": "mp4", "badge": "Fast"},
+                {"id": "bestaudio/best", "name": "Audio Only (MP3)", "ext": "mp3", "badge": "Audio"}
             ]
             return {
                 "title": title,
@@ -211,7 +209,7 @@ def extract_youtube_fallback(url: str) -> Optional[Dict[str, Any]]:
                 "url": url,
                 "presets": presets,
                 "formats": [
-                    {"id": "best", "quality": "HD (720p/360p)", "height": 720, "ext": "mp4", "size": "Auto", "type": "video"}
+                    {"id": "best", "quality": "HD (Video + Audio)", "height": 720, "ext": "mp4", "size": "Auto", "type": "video"}
                 ],
                 "audio_formats": [
                     {"id": "bestaudio", "quality": "128 kbps", "ext": "mp3", "size": "Auto", "type": "audio"}
@@ -307,22 +305,22 @@ def get_youtube_direct_stream(url: str, is_audio: bool = False, format_spec: str
                 else:
                     video_fs = [f for f in formats if f.get('vcodec') != 'none']
                     if video_fs:
-                        # Prioritize progressive formats with audio (format 18 = 360p mp4 with audio)
-                        prog_fs = [f for f in video_fs if f.get('acodec') != 'none']
-                        pool = prog_fs if prog_fs else video_fs
-                        pool.sort(key=lambda f: f.get('height') or 0, reverse=True)
-                        matching = [f for f in pool if (f.get('height') or 0) <= target_height]
-                        chosen = matching[0] if matching else pool[0]
-                        return {
-                            "stream_url": chosen['url'],
-                            "filename": f"{title}.mp4",
-                            "media_type": "video/mp4",
-                            "content_length": chosen.get('filesize') or chosen.get('filesize_approx')
-                        }
+                        # STRICT REQUIREMENT: Video MUST contain audio (progressive stream)
+                        prog_fs = [f for f in video_fs if f.get('acodec') and f.get('acodec') != 'none']
+                        if prog_fs:
+                            prog_fs.sort(key=lambda f: f.get('height') or 0, reverse=True)
+                            matching = [f for f in prog_fs if (f.get('height') or 0) <= target_height]
+                            chosen = matching[0] if matching else prog_fs[0]
+                            return {
+                                "stream_url": chosen['url'],
+                                "filename": f"{title}.mp4",
+                                "media_type": "video/mp4",
+                                "content_length": chosen.get('filesize') or chosen.get('filesize_approx')
+                            }
     except Exception as e:
         print(f"yt-dlp direct stream extraction error: {e}")
 
-    # --- FALLBACK: Invidious proxy (uses instance's own /videoplayback relay, not raw googlevideo URLs) ---
+    # --- FALLBACK: Invidious proxy (progressive streams ONLY, never silent adaptive formats) ---
     instances = [
         'https://yt.chocolatemoo53.com',
         'https://invidious.nerdvpn.de',
@@ -347,7 +345,6 @@ def get_youtube_direct_stream(url: str, is_audio: bool = False, format_spec: str
                         chosen_audio = audio_candidates[0]
                         parsed = urllib.parse.urlparse(chosen_audio['url'])
                         proxy_url = f"{inst}/videoplayback?{parsed.query}"
-                        # Verify the proxy URL responds before returning
                         try:
                             check = requests.head(proxy_url, timeout=5, allow_redirects=True)
                             if check.status_code >= 400:
@@ -362,7 +359,7 @@ def get_youtube_direct_stream(url: str, is_audio: bool = False, format_spec: str
                             "content_length": int(clen) if clen else None
                         }
                 else:
-                    # 1. Prefer progressive streams (pre-muxed audio & video)
+                    # ONLY progressive streams (pre-muxed audio & video). NEVER return silent adaptive streams!
                     if streams:
                         streams.sort(key=_extract_height, reverse=True)
                         matching = [s for s in streams if _extract_height(s) <= target_height]
@@ -378,33 +375,6 @@ def get_youtube_direct_stream(url: str, is_audio: bool = False, format_spec: str
                             except Exception:
                                 continue
                             clen = chosen_stream.get('clen')
-                            return {
-                                "stream_url": proxy_url,
-                                "filename": f"{title}.mp4",
-                                "media_type": "video/mp4",
-                                "content_length": int(clen) if clen else None
-                            }
-
-                    # 2. Fallback to adaptive streams (video-only, no audio) via Invidious proxy
-                    mp4_videos = [a for a in adaptive if 'video/mp4' in a.get('type', '') and a.get('url')]
-                    if not mp4_videos:
-                        mp4_videos = [a for a in adaptive if 'video/' in a.get('type', '') and a.get('url')]
-
-                    if mp4_videos:
-                        mp4_videos.sort(key=_extract_height, reverse=True)
-                        matching_adaptive = [a for a in mp4_videos if _extract_height(a) <= target_height]
-                        chosen_adaptive = matching_adaptive[0] if matching_adaptive else mp4_videos[0]
-                        v_url = chosen_adaptive.get('url')
-                        if v_url:
-                            parsed = urllib.parse.urlparse(v_url)
-                            proxy_url = f"{inst}/videoplayback?{parsed.query}"
-                            try:
-                                check = requests.head(proxy_url, timeout=5, allow_redirects=True)
-                                if check.status_code >= 400:
-                                    continue
-                            except Exception:
-                                continue
-                            clen = chosen_adaptive.get('clen')
                             return {
                                 "stream_url": proxy_url,
                                 "filename": f"{title}.mp4",
@@ -503,10 +473,19 @@ def download_youtube_fallback(url: str, req_id: str, is_audio: bool = False) -> 
                                 if os.path.exists(v_temp): os.remove(v_temp)
                                 if os.path.exists(a_temp): os.remove(a_temp)
                             except Exception:
-                                if os.path.exists(v_temp): os.rename(v_temp, target)
+                                if os.path.exists(v_temp):
+                                    try: os.remove(v_temp)
+                                    except Exception: pass
+                                if os.path.exists(a_temp):
+                                    try: os.remove(a_temp)
+                                    except Exception: pass
+                                continue
                         else:
+                            # Without ffmpeg, we cannot mux video and audio. Never return silent video!
                             if os.path.exists(v_temp):
-                                os.rename(v_temp, target)
+                                try: os.remove(v_temp)
+                                except Exception: pass
+                            continue
                         if os.path.exists(target) and os.path.getsize(target) > 0:
                             return {
                                 "filepath": target,
@@ -604,6 +583,7 @@ def get_media_info(url: str) -> Dict[str, Any]:
         raw_formats = info.get('formats', [])
         video_options: List[Dict[str, Any]] = []
         audio_options: List[Dict[str, Any]] = []
+        ffmpeg_available = has_ffmpeg()
 
         seen_resolutions = set()
         
@@ -615,8 +595,10 @@ def get_media_info(url: str) -> Dict[str, Any]:
             ext = f.get('ext', 'mp4')
             filesize = f.get('filesize') or f.get('filesize_approx')
 
-            # Video streams
+            # Video streams (if no ffmpeg, only show formats that include audio)
             if vcodec != 'none' and height:
+                if not ffmpeg_available and (not acodec or acodec == 'none'):
+                    continue
                 res_key = f"{height}p"
                 if res_key not in seen_resolutions:
                     seen_resolutions.add(res_key)
@@ -655,12 +637,11 @@ def get_media_info(url: str) -> Dict[str, Any]:
                 "type": "video"
             })
 
-        # Safe presets that always work (with or without ffmpeg)
+        # Safe presets that always include sound (progressive audio+video)
         presets = [
-            {"id": "best", "name": "Best Quality (HD)", "ext": "mp4", "badge": "Fast"},
-            {"id": "best[height<=720]/best", "name": "720p HD", "ext": "mp4", "badge": "720p"},
-            {"id": "best[height<=480]/best", "name": "480p SD", "ext": "mp4", "badge": "480p"},
-            {"id": "bestaudio/best", "name": "Audio Only", "ext": "mp3", "badge": "Audio"}
+            {"id": "best", "name": "Best Quality (Video + Audio)", "ext": "mp4", "badge": "Full"},
+            {"id": "18", "name": "Standard (360p + Audio)", "ext": "mp4", "badge": "Fast"},
+            {"id": "bestaudio/best", "name": "Audio Only (MP3)", "ext": "mp3", "badge": "Audio"}
         ]
 
         return {
@@ -720,17 +701,17 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
             ydl_opts['format'] = format_spec
             ydl_opts['merge_output_format'] = 'mp4'
         else:
-            # Fallback to single stream with progressive audio+video fallback
-            clean_format = format_spec.replace("bestvideo+bestaudio/", "")
-            if "+" in clean_format or clean_format == "best":
-                # Prefer progressive streams containing both audio and video (format 18 is YouTube's reliable standard)
-                ydl_opts['format'] = '18/best[vcodec!=none][acodec!=none]/best/b'
-            elif "height<=720" in clean_format:
-                ydl_opts['format'] = 'best[height<=720][acodec!=none]/18/best[acodec!=none]/best'
+            # Fallback to single progressive stream with audio (format 22 or 18)
+            # STRICT: Always require [acodec!=none] so video always has audio!
+            clean_format = format_spec.replace("bestvideo+bestaudio/", "").replace("/best", "").replace("/b", "")
+            if "height<=720" in clean_format:
+                ydl_opts['format'] = '22/best[height<=720][acodec!=none]/18/best[vcodec!=none][acodec!=none]'
             elif "height<=480" in clean_format:
-                ydl_opts['format'] = 'best[height<=480][acodec!=none]/18/best[acodec!=none]/best'
+                ydl_opts['format'] = 'best[height<=480][acodec!=none]/18/best[vcodec!=none][acodec!=none]'
+            elif clean_format and clean_format != "best":
+                ydl_opts['format'] = f"{clean_format}[acodec!=none]/22/18/best[vcodec!=none][acodec!=none]"
             else:
-                ydl_opts['format'] = f"{clean_format}/best[acodec!=none]/18/best/b"
+                ydl_opts['format'] = '22/18/best[vcodec!=none][acodec!=none]'
 
     info = None
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -744,7 +725,7 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
                 if is_audio:
                     ydl_opts['format'] = 'bestaudio/best'
                 else:
-                    ydl_opts['format'] = '18/best[acodec!=none]/best/b'
+                    ydl_opts['format'] = '22/18/best[vcodec!=none][acodec!=none]'
                 try:
                     with yt_dlp.YoutubeDL(ydl_opts) as retry_ydl:
                         info = retry_ydl.extract_info(url, download=True)
