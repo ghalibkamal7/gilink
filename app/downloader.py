@@ -925,7 +925,58 @@ def get_media_info(url: str) -> Dict[str, Any]:
         raw_formats = info.get('formats', [])
         video_options: List[Dict[str, Any]] = []
         audio_options: List[Dict[str, Any]] = []
-        ffmpeg_available = has_ffmpeg()
+        # Determine platform for special handling
+    platform = detect_platform(url)
+    if platform == "Instagram":
+        # Instagram usually provides a combined video+audio stream; use the generic 'best' format.
+        # This works for both video and audio (ffmpeg will extract audio when needed).
+        if is_audio:
+            if ffmpeg_available:
+                ydl_opts['format'] = 'best'
+                ydl_opts['postprocessors'] = [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192',
+                }]
+            else:
+                ydl_opts['format'] = 'best'
+        else:
+            if ffmpeg_available:
+                ydl_opts['format'] = 'bestvideo+bestaudio/best'
+                ydl_opts['merge_output_format'] = 'mp4'
+            else:
+                ydl_opts['format'] = 'best'
+        # Skip the generic YouTube/ffmpeg format logic below for Instagram
+    else:
+        # Existing logic for non‑Instagram platforms
+        if is_audio:
+            if ffmpeg_available:
+                ydl_opts['format'] = 'bestaudio/best'
+                ydl_opts['postprocessors'] = [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192',
+                }]
+            else:
+                ydl_opts['format'] = 'bestaudio/best'
+        else:
+            # If ffmpeg is present, allow bestvideo+bestaudio merging, else use pre‑merged progressive stream
+            if ffmpeg_available and ("+" in format_spec):
+                ydl_opts['format'] = format_spec
+                ydl_opts['merge_output_format'] = 'mp4'
+            else:
+                # Fallback to single progressive stream with audio (format 22 or 18)
+                # STRICT: Always require [acodec!=none] so video always has audio!
+                clean_format = format_spec.replace("bestvideo+bestaudio/", "").replace("/best", "").replace("/b", "")
+                if "height<=720" in clean_format:
+                    ydl_opts['format'] = '22/best[height<=720][acodec!=none]/18/best[vcodec!=none][acodec!=none]'
+                elif "height<=480" in clean_format:
+                    ydl_opts['format'] = 'best[height<=480][acodec!=none]/18/best[vcodec!=none][acodec!=none]'
+                elif clean_format and clean_format != "best":
+                    ydl_opts['format'] = f"{clean_format}[acodec!=none]/22/18/best[vcodec!=none][acodec!=none]"
+                else:
+                    ydl_opts['format'] = '22/18/best[vcodec!=none][acodec!=none]'
+
 
         seen_resolutions = set()
         
@@ -1024,7 +1075,58 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
     if proxy and proxy.strip():
         ydl_opts['proxy'] = proxy.strip()
 
-    ffmpeg_available = has_ffmpeg()
+    # Determine platform for special handling
+    platform = detect_platform(url)
+    if platform == "Instagram":
+        # Instagram usually provides a combined video+audio stream; use the generic 'best' format.
+        # This works for both video and audio (ffmpeg will extract audio when needed).
+        if is_audio:
+            if ffmpeg_available:
+                ydl_opts['format'] = 'best'
+                ydl_opts['postprocessors'] = [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192',
+                }]
+            else:
+                ydl_opts['format'] = 'best'
+        else:
+            if ffmpeg_available:
+                ydl_opts['format'] = 'bestvideo+bestaudio/best'
+                ydl_opts['merge_output_format'] = 'mp4'
+            else:
+                ydl_opts['format'] = 'best'
+        # Skip the generic YouTube/ffmpeg format logic below for Instagram
+    else:
+        # Existing logic for non‑Instagram platforms
+        if is_audio:
+            if ffmpeg_available:
+                ydl_opts['format'] = 'bestaudio/best'
+                ydl_opts['postprocessors'] = [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192',
+                }]
+            else:
+                ydl_opts['format'] = 'bestaudio/best'
+        else:
+            # If ffmpeg is present, allow bestvideo+bestaudio merging, else use pre‑merged progressive stream
+            if ffmpeg_available and ("+" in format_spec):
+                ydl_opts['format'] = format_spec
+                ydl_opts['merge_output_format'] = 'mp4'
+            else:
+                # Fallback to single progressive stream with audio (format 22 or 18)
+                # STRICT: Always require [acodec!=none] so video always has audio!
+                clean_format = format_spec.replace("bestvideo+bestaudio/", "").replace("/best", "").replace("/b", "")
+                if "height<=720" in clean_format:
+                    ydl_opts['format'] = '22/best[height<=720][acodec!=none]/18/best[vcodec!=none][acodec!=none]'
+                elif "height<=480" in clean_format:
+                    ydl_opts['format'] = 'best[height<=480][acodec!=none]/18/best[vcodec!=none][acodec!=none]'
+                elif clean_format and clean_format != "best":
+                    ydl_opts['format'] = f"{clean_format}[acodec!=none]/22/18/best[vcodec!=none][acodec!=none]"
+                else:
+                    ydl_opts['format'] = '22/18/best[vcodec!=none][acodec!=none]'
+
 
     # Determine platform for special handling
     platform = detect_platform(url)
