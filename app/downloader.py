@@ -453,7 +453,7 @@ def get_youtube_direct_stream(url: str, is_audio: bool = False, format_spec: str
             }
         }
         cookie_file = get_cookies_filepath()
-        if cookie_file:
+        ffmpeg_available = has_ffmpeg()
             y_opts['cookiefile'] = cookie_file
         with yt_dlp.YoutubeDL(y_opts) as ydl:
             yt_info = ydl.extract_info(url, download=False)
@@ -690,7 +690,7 @@ def get_media_info(url: str) -> Dict[str, Any]:
 
     # Pass cookies if available (required for Instagram/YouTube on cloud datacenters)
     cookie_file = get_cookies_filepath()
-    if cookie_file:
+    ffmpeg_available = has_ffmpeg()
         ydl_opts['cookiefile'] = cookie_file
 
     proxy = os.environ.get("YOUTUBE_PROXY") or os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
@@ -1070,6 +1070,9 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
     cookie_file = get_cookies_filepath()
     if cookie_file:
         ydl_opts['cookiefile'] = cookie_file
+
+    # Determine if ffmpeg binary is available – needed for later logic
+    ffmpeg_available = has_ffmpeg()
 
     proxy = os.environ.get("YOUTUBE_PROXY") or os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
     if proxy and proxy.strip():
