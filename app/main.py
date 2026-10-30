@@ -415,7 +415,8 @@ def stream_remote(proxy_url: str):
                 yield chunk
 
 def make_direct_stream_response(direct: Dict[str, Any]):
-    """Construct a streaming response that forwards Content-Length for real-time progress bars."""
+    """Construct a streaming response that forwards Content-Length for real-time progress bars.
+    Returns None if the remote stream is invalid/expired so caller can try next fallback."""
     import requests
     safe_ascii = re.sub(r'[^\x20-\x7E]', '_', direct["filename"]).replace('"', '').replace(';', '')
     if not safe_ascii.strip():
@@ -425,15 +426,41 @@ def make_direct_stream_response(direct: Dict[str, Any]):
         "Content-Disposition": f'attachment; filename="{safe_ascii}"; filename*=UTF-8\'\'{encoded_fn}'
     }
 
-    remote_resp = requests.get(direct["stream_url"], stream=True, timeout=60)
-    cl = remote_resp.headers.get("content-length") or direct.get("content_length")
+    try:
+        remote_resp = requests.get(direct["stream_url"], stream=True, timeout=60)
+    except Exception as e:
+        print(f"Stream URL request failed: {e}")
+        return None
+
+    # Check if response is actually media (not an error page or expired URL text)
+    ct = remote_resp.headers.get("content-type", "")
+    cl_raw = remote_resp.headers.get("content-length")
+
+    # If response is tiny text (like "Videoplayback URL has expired."), it's an error
+    if cl_raw and int(cl_raw) < 200 and ("text/" in ct or "application/json" in ct):
+        remote_resp.close()
+        return None
+
+    # If HTTP error status
+    if remote_resp.status_code >= 400:
+        remote_resp.close()
+        return None
+
+    cl = cl_raw or direct.get("content_length")
     if cl:
         headers["Content-Length"] = str(cl)
 
     def iter_remote():
+        first_chunk = True
         try:
             for chunk in remote_resp.iter_content(chunk_size=64 * 1024):
                 if chunk:
+                    # Detect error response masquerading as media on first chunk
+                    if first_chunk and len(chunk) < 200:
+                        text_check = chunk.decode('utf-8', errors='ignore').strip().lower()
+                        if 'expired' in text_check or 'error' in text_check or '<html' in text_check:
+                            return
+                    first_chunk = False
                     yield chunk
         finally:
             remote_resp.close()
@@ -467,7 +494,9 @@ async def trigger_download(
     if detect_platform(url) == "YouTube":
         direct = get_youtube_direct_stream(url, is_audio=is_audio, format_spec=format_spec)
         if direct:
-            return make_direct_stream_response(direct)
+            direct_resp = make_direct_stream_response(direct)
+            if direct_resp:
+                return direct_resp
 
     try:
         result = download_media(url, format_spec, is_audio)
@@ -498,7 +527,9 @@ async def trigger_download(
         if detect_platform(url) == "YouTube":
             direct = get_youtube_direct_stream(url, is_audio=is_audio, format_spec=format_spec)
             if direct:
-                return make_direct_stream_response(direct)
+                direct_resp = make_direct_stream_response(direct)
+                if direct_resp:
+                    return direct_resp
 
         err_msg = str(e)
         if "Sign in to confirm you’re not a bot" in err_msg or "Sign in to confirm" in err_msg:

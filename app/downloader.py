@@ -234,17 +234,33 @@ def _extract_height(stream_dict: Dict[str, Any]) -> int:
         return int(m.group(1))
     return 0
 
+def _is_url_expired(url_str: str) -> bool:
+    """Check if a YouTube videoplayback URL has expired by examining its 'expire' parameter."""
+    import time
+    try:
+        parsed = urllib.parse.urlparse(url_str)
+        params = urllib.parse.parse_qs(parsed.query)
+        expire_vals = params.get('expire', [])
+        if expire_vals:
+            expire_ts = int(expire_vals[0])
+            # Consider expired if less than 30 seconds remaining
+            return expire_ts < (time.time() + 30)
+    except Exception:
+        pass
+    return False
+
+
 def get_youtube_direct_stream(url: str, is_audio: bool = False, format_spec: str = "best") -> Optional[Dict[str, Any]]:
-    """Return an instant streaming proxy URL for YouTube with optimal quality selection."""
+    """Return an instant streaming proxy URL for YouTube with optimal quality selection.
+    
+    Priority order:
+    1. yt-dlp with android/ios/tv mobile clients (most reliable on cloud, fresh URLs for this IP)
+    2. Invidious proxy (only if yt-dlp fails, uses instance's /videoplayback proxy endpoint)
+    """
     vid_match = re.search(r'(?:v=|\/|youtu\.be\/|shorts\/)([0-9A-Za-z_-]{11})', url)
     if not vid_match:
         return None
     video_id = vid_match.group(1)
-    instances = [
-        'https://yt.chocolatemoo53.com',
-        'https://invidious.nerdvpn.de',
-        'https://inv.nadeko.net'
-    ]
 
     target_height = 9999
     if '1080' in format_spec:
@@ -256,6 +272,62 @@ def get_youtube_direct_stream(url: str, is_audio: bool = False, format_spec: str
     elif '360' in format_spec:
         target_height = 360
 
+    # --- PRIMARY: yt-dlp mobile client extraction (URLs are fresh & bound to this server's IP) ---
+    try:
+        y_opts = {
+            'quiet': True,
+            'skip_download': True,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'ios', 'tv']
+                }
+            }
+        }
+        cookie_file = get_cookies_filepath()
+        if cookie_file:
+            y_opts['cookiefile'] = cookie_file
+        with yt_dlp.YoutubeDL(y_opts) as ydl:
+            yt_info = ydl.extract_info(url, download=False)
+            if yt_info:
+                title = sanitize_filename(yt_info.get('title') or "YouTube_Media")
+                formats = [f for f in yt_info.get('formats', []) if f.get('url') and not _is_url_expired(f['url'])]
+                if is_audio:
+                    audio_fs = [f for f in formats if f.get('vcodec') == 'none' and f.get('acodec') != 'none']
+                    if not audio_fs:
+                        audio_fs = formats
+                    audio_fs.sort(key=lambda f: f.get('abr') or f.get('tbr') or 0, reverse=True)
+                    if audio_fs:
+                        chosen = audio_fs[0]
+                        return {
+                            "stream_url": chosen['url'],
+                            "filename": f"{title}.mp3",
+                            "media_type": "audio/mpeg",
+                            "content_length": chosen.get('filesize') or chosen.get('filesize_approx')
+                        }
+                else:
+                    video_fs = [f for f in formats if f.get('vcodec') != 'none']
+                    if video_fs:
+                        # Prioritize progressive formats with audio (format 18 = 360p mp4 with audio)
+                        prog_fs = [f for f in video_fs if f.get('acodec') != 'none']
+                        pool = prog_fs if prog_fs else video_fs
+                        pool.sort(key=lambda f: f.get('height') or 0, reverse=True)
+                        matching = [f for f in pool if (f.get('height') or 0) <= target_height]
+                        chosen = matching[0] if matching else pool[0]
+                        return {
+                            "stream_url": chosen['url'],
+                            "filename": f"{title}.mp4",
+                            "media_type": "video/mp4",
+                            "content_length": chosen.get('filesize') or chosen.get('filesize_approx')
+                        }
+    except Exception as e:
+        print(f"yt-dlp direct stream extraction error: {e}")
+
+    # --- FALLBACK: Invidious proxy (uses instance's own /videoplayback relay, not raw googlevideo URLs) ---
+    instances = [
+        'https://yt.chocolatemoo53.com',
+        'https://invidious.nerdvpn.de',
+        'https://inv.nadeko.net'
+    ]
     for inst in instances:
         try:
             r = requests.get(f'{inst}/api/v1/videos/{video_id}', timeout=5)
@@ -268,7 +340,6 @@ def get_youtube_direct_stream(url: str, is_audio: bool = False, format_spec: str
                 if is_audio:
                     audio_candidates = [a for a in adaptive if 'audio/' in a.get('type', '') and a.get('url')]
                     if audio_candidates:
-                        # Sort by bitrate with preference for standard mp4a AAC
                         audio_candidates.sort(
                             key=lambda a: int(a.get('bitrate') or 0) + (1000000 if 'audio/mp4' in a.get('type', '') else 0),
                             reverse=True
@@ -276,6 +347,13 @@ def get_youtube_direct_stream(url: str, is_audio: bool = False, format_spec: str
                         chosen_audio = audio_candidates[0]
                         parsed = urllib.parse.urlparse(chosen_audio['url'])
                         proxy_url = f"{inst}/videoplayback?{parsed.query}"
+                        # Verify the proxy URL responds before returning
+                        try:
+                            check = requests.head(proxy_url, timeout=5, allow_redirects=True)
+                            if check.status_code >= 400:
+                                continue
+                        except Exception:
+                            continue
                         clen = chosen_audio.get('clen')
                         return {
                             "stream_url": proxy_url,
@@ -293,6 +371,12 @@ def get_youtube_direct_stream(url: str, is_audio: bool = False, format_spec: str
                         if s_url:
                             parsed = urllib.parse.urlparse(s_url)
                             proxy_url = f"{inst}/videoplayback?{parsed.query}"
+                            try:
+                                check = requests.head(proxy_url, timeout=5, allow_redirects=True)
+                                if check.status_code >= 400:
+                                    continue
+                            except Exception:
+                                continue
                             clen = chosen_stream.get('clen')
                             return {
                                 "stream_url": proxy_url,
@@ -301,7 +385,7 @@ def get_youtube_direct_stream(url: str, is_audio: bool = False, format_spec: str
                                 "content_length": int(clen) if clen else None
                             }
 
-                    # 2. Fallback to adaptive streams sorted highest-to-lowest resolution
+                    # 2. Fallback to adaptive streams (video-only, no audio) via Invidious proxy
                     mp4_videos = [a for a in adaptive if 'video/mp4' in a.get('type', '') and a.get('url')]
                     if not mp4_videos:
                         mp4_videos = [a for a in adaptive if 'video/' in a.get('type', '') and a.get('url')]
@@ -314,6 +398,12 @@ def get_youtube_direct_stream(url: str, is_audio: bool = False, format_spec: str
                         if v_url:
                             parsed = urllib.parse.urlparse(v_url)
                             proxy_url = f"{inst}/videoplayback?{parsed.query}"
+                            try:
+                                check = requests.head(proxy_url, timeout=5, allow_redirects=True)
+                                if check.status_code >= 400:
+                                    continue
+                            except Exception:
+                                continue
                             clen = chosen_adaptive.get('clen')
                             return {
                                 "stream_url": proxy_url,
@@ -323,53 +413,6 @@ def get_youtube_direct_stream(url: str, is_audio: bool = False, format_spec: str
                             }
         except Exception:
             continue
-
-    # 3. Direct mobile client stream extraction fallback (100% cloud-safe, bypasses bot challenges)
-    try:
-        y_opts = {
-            'quiet': True,
-            'skip_download': True,
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android', 'ios', 'tv']
-                }
-            }
-        }
-        with yt_dlp.YoutubeDL(y_opts) as ydl:
-            yt_info = ydl.extract_info(url, download=False)
-            if yt_info:
-                title = sanitize_filename(yt_info.get('title') or "YouTube_Media")
-                formats = [f for f in yt_info.get('formats', []) if f.get('url')]
-                if is_audio:
-                    audio_fs = [f for f in formats if f.get('vcodec') == 'none' and f.get('acodec') != 'none']
-                    if not audio_fs:
-                        audio_fs = formats
-                    audio_fs.sort(key=lambda f: f.get('abr') or f.get('tbr') or 0, reverse=True)
-                    if audio_fs:
-                        chosen = audio_fs[0]
-                        return {
-                            "stream_url": chosen['url'],
-                            "filename": f"{title}.mp3",
-                            "media_type": "audio/mpeg",
-                            "content_length": chosen.get('filesize') or chosen.get('filesize_approx')
-                        }
-                else:
-                    video_fs = [f for f in formats if f.get('vcodec') != 'none']
-                    if video_fs:
-                        # Prioritize progressive formats with audio
-                        prog_fs = [f for f in video_fs if f.get('acodec') != 'none']
-                        pool = prog_fs if prog_fs else video_fs
-                        pool.sort(key=lambda f: f.get('height') or 0, reverse=True)
-                        matching = [f for f in pool if (f.get('height') or 0) <= target_height]
-                        chosen = matching[0] if matching else pool[0]
-                        return {
-                            "stream_url": chosen['url'],
-                            "filename": f"{title}.mp4",
-                            "media_type": "video/mp4",
-                            "content_length": chosen.get('filesize') or chosen.get('filesize_approx')
-                        }
-    except Exception as e:
-        print(f"Direct yt-dlp stream extraction error: {e}")
 
     return None
 
