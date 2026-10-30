@@ -81,6 +81,119 @@ def get_cookies_filepath() -> Optional[str]:
                 f.write("\n".join(all_cookie_lines) + "\n")
             return cookie_path
         except Exception as e:
+            err_msg = str(e)
+            platform = detect_platform(url)
+            # Instagram authentication required error handling
+            if platform == "Instagram" and "Instagram sent an empty media response" in err_msg:
+                raise ValueError(
+                    "Instagram download failed: missing or invalid cookies. "
+                    "Set the INSTAGRAM_COOKIES environment variable with a valid session cookie and redeploy."
+                )
+            # Handle Instagram extraction failures gracefully by retrying with a generic best format
+            if platform == "Instagram":
+                if is_audio:
+                    # For audio, use best and let ffmpeg extract if available
+                    if ffmpeg_available:
+                        ydl_opts['format'] = 'best'
+                        ydl_opts['postprocessors'] = [{
+                            'key': 'FFmpegExtractAudio',
+                            'preferredcodec': 'mp3',
+                            'preferredquality': '192',
+                        }]
+                    else:
+                        ydl_opts['format'] = 'best'
+                else:
+                    # For video, prefer combined video+audio
+                    if ffmpeg_available:
+                        ydl_opts['format'] = 'bestvideo+bestaudio/best'
+                        ydl_opts['merge_output_format'] = 'mp4'
+                    else:
+                        ydl_opts['format'] = 'best'
+                # Remove any postprocessors that may cause errors for video
+                if not is_audio:
+                    ydl_opts.pop('postprocessors', None)
+                try:
+                    info = ydl.extract_info(url, download=True)
+                except Exception:
+                    info = None
+            # Existing YouTube fallback logic remains unchanged
+            if not info and detect_platform(url) == "YouTube":
+                yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
+                if yt_fallback:
+                    return yt_fallback
+
+            if not info:
+                # If still no info, attempt generic fallback for YouTube again (existing logic)
+                if detect_platform(url) == "YouTube":
+                    yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
+                    if yt_fallback:
+                        return yt_fallback
+                raise e
+            platform = detect_platform(url)
+            # Handle Instagram extraction failures gracefully by retrying with a generic best format
+            if platform == "Instagram":
+                if is_audio:
+                    # For audio, use best and let ffmpeg extract if available
+                    if ffmpeg_available:
+                        ydl_opts['format'] = 'best'
+                        ydl_opts['postprocessors'] = [{
+                            'key': 'FFmpegExtractAudio',
+                            'preferredcodec': 'mp3',
+                            'preferredquality': '192',
+                        }]
+                    else:
+                        ydl_opts['format'] = 'best'
+                else:
+                    # For video, prefer combined video+audio
+                    if ffmpeg_available:
+                        ydl_opts['format'] = 'bestvideo+bestaudio/best'
+                        ydl_opts['merge_output_format'] = 'mp4'
+                    else:
+                        ydl_opts['format'] = 'best'
+                # Remove any existing postprocessors that may cause errors for video
+                if not is_audio:
+                    ydl_opts.pop('postprocessors', None)
+                try:
+                    info = ydl.extract_info(url, download=True)
+                except Exception:
+                    info = None
+            # Existing YouTube fallback logic remains unchanged
+            if not info and detect_platform(url) == "YouTube":
+                yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
+                if yt_fallback:
+                    return yt_fallback
+
+            if not info:
+                # If still no info, attempt generic fallback for YouTube again (existing logic)
+                if detect_platform(url) == "YouTube":
+                    yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
+                    if yt_fallback:
+                        return yt_fallback
+                raise e
+            platform = detect_platform(url)
+            # Handle Instagram extraction failures gracefully by retrying with a generic best format
+            if platform == "Instagram":
+                # Reset format to best available and retry download without metadata processing
+                ydl_opts['format'] = 'best'
+                # Remove postprocessors to avoid ffmpeg errors if not needed
+                ydl_opts.pop('postprocessors', None)
+                try:
+                    info = ydl.extract_info(url, download=True)
+                except Exception:
+                    info = None
+            # Existing YouTube fallback logic remains unchanged
+            if not info and detect_platform(url) == "YouTube":
+                yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
+                if yt_fallback:
+                    return yt_fallback
+
+            if not info:
+                # If still no info, attempt generic fallback for YouTube again (existing logic)
+                if detect_platform(url) == "YouTube":
+                    yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
+                    if yt_fallback:
+                        return yt_fallback
+                raise e
             print(f"Error writing cookies file: {e}")
             return None
 
@@ -532,6 +645,119 @@ def get_media_info(url: str) -> Dict[str, Any]:
             info = ydl.extract_info(url, download=False)
         except Exception as e:
             err_msg = str(e)
+            platform = detect_platform(url)
+            # Instagram authentication required error handling
+            if platform == "Instagram" and "Instagram sent an empty media response" in err_msg:
+                raise ValueError(
+                    "Instagram download failed: missing or invalid cookies. "
+                    "Set the INSTAGRAM_COOKIES environment variable with a valid session cookie and redeploy."
+                )
+            # Handle Instagram extraction failures gracefully by retrying with a generic best format
+            if platform == "Instagram":
+                if is_audio:
+                    # For audio, use best and let ffmpeg extract if available
+                    if ffmpeg_available:
+                        ydl_opts['format'] = 'best'
+                        ydl_opts['postprocessors'] = [{
+                            'key': 'FFmpegExtractAudio',
+                            'preferredcodec': 'mp3',
+                            'preferredquality': '192',
+                        }]
+                    else:
+                        ydl_opts['format'] = 'best'
+                else:
+                    # For video, prefer combined video+audio
+                    if ffmpeg_available:
+                        ydl_opts['format'] = 'bestvideo+bestaudio/best'
+                        ydl_opts['merge_output_format'] = 'mp4'
+                    else:
+                        ydl_opts['format'] = 'best'
+                # Remove any postprocessors that may cause errors for video
+                if not is_audio:
+                    ydl_opts.pop('postprocessors', None)
+                try:
+                    info = ydl.extract_info(url, download=True)
+                except Exception:
+                    info = None
+            # Existing YouTube fallback logic remains unchanged
+            if not info and detect_platform(url) == "YouTube":
+                yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
+                if yt_fallback:
+                    return yt_fallback
+
+            if not info:
+                # If still no info, attempt generic fallback for YouTube again (existing logic)
+                if detect_platform(url) == "YouTube":
+                    yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
+                    if yt_fallback:
+                        return yt_fallback
+                raise e
+            platform = detect_platform(url)
+            # Handle Instagram extraction failures gracefully by retrying with a generic best format
+            if platform == "Instagram":
+                if is_audio:
+                    # For audio, use best and let ffmpeg extract if available
+                    if ffmpeg_available:
+                        ydl_opts['format'] = 'best'
+                        ydl_opts['postprocessors'] = [{
+                            'key': 'FFmpegExtractAudio',
+                            'preferredcodec': 'mp3',
+                            'preferredquality': '192',
+                        }]
+                    else:
+                        ydl_opts['format'] = 'best'
+                else:
+                    # For video, prefer combined video+audio
+                    if ffmpeg_available:
+                        ydl_opts['format'] = 'bestvideo+bestaudio/best'
+                        ydl_opts['merge_output_format'] = 'mp4'
+                    else:
+                        ydl_opts['format'] = 'best'
+                # Remove any existing postprocessors that may cause errors for video
+                if not is_audio:
+                    ydl_opts.pop('postprocessors', None)
+                try:
+                    info = ydl.extract_info(url, download=True)
+                except Exception:
+                    info = None
+            # Existing YouTube fallback logic remains unchanged
+            if not info and detect_platform(url) == "YouTube":
+                yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
+                if yt_fallback:
+                    return yt_fallback
+
+            if not info:
+                # If still no info, attempt generic fallback for YouTube again (existing logic)
+                if detect_platform(url) == "YouTube":
+                    yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
+                    if yt_fallback:
+                        return yt_fallback
+                raise e
+            platform = detect_platform(url)
+            # Handle Instagram extraction failures gracefully by retrying with a generic best format
+            if platform == "Instagram":
+                # Reset format to best available and retry download without metadata processing
+                ydl_opts['format'] = 'best'
+                # Remove postprocessors to avoid ffmpeg errors if not needed
+                ydl_opts.pop('postprocessors', None)
+                try:
+                    info = ydl.extract_info(url, download=True)
+                except Exception:
+                    info = None
+            # Existing YouTube fallback logic remains unchanged
+            if not info and detect_platform(url) == "YouTube":
+                yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
+                if yt_fallback:
+                    return yt_fallback
+
+            if not info:
+                # If still no info, attempt generic fallback for YouTube again (existing logic)
+                if detect_platform(url) == "YouTube":
+                    yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
+                    if yt_fallback:
+                        return yt_fallback
+                raise e
+            err_msg = str(e)
             # Automatic fallback for YouTube if cloud IP is challenged
             if detect_platform(url) == "YouTube":
                 if 'cookiefile' in ydl_opts:
@@ -684,17 +910,32 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
 
     ffmpeg_available = has_ffmpeg()
 
+    # Determine platform for special handling
+    platform = detect_platform(url)
     if is_audio:
-        if ffmpeg_available:
-            ydl_opts['format'] = 'bestaudio/best'
-            ydl_opts['postprocessors'] = [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }]
+        if platform == "Instagram":
+            # Instagram often provides combined video+audio; use best format and let ffmpeg extract audio
+            if ffmpeg_available:
+                ydl_opts['format'] = 'best'
+                ydl_opts['postprocessors'] = [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192',
+                }]
+            else:
+                # Without ffmpeg, download best and rely on client to handle MP4 (fallback)
+                ydl_opts['format'] = 'best'
         else:
-            # Fallback when ffmpeg is not available: extract direct bestaudio without transcoding
-            ydl_opts['format'] = 'bestaudio/best'
+            if ffmpeg_available:
+                ydl_opts['format'] = 'bestaudio/best'
+                ydl_opts['postprocessors'] = [{
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192',
+                }]
+            else:
+                # Fallback when ffmpeg is not available: extract direct bestaudio without transcoding
+                ydl_opts['format'] = 'bestaudio/best'
     else:
         # If ffmpeg is present, allow bestvideo+bestaudio merging, else use pre-merged progressive stream
         if ffmpeg_available and ("+" in format_spec):
@@ -718,6 +959,119 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
         try:
             info = ydl.extract_info(url, download=True)
         except Exception as e:
+            err_msg = str(e)
+            platform = detect_platform(url)
+            # Instagram authentication required error handling
+            if platform == "Instagram" and "Instagram sent an empty media response" in err_msg:
+                raise ValueError(
+                    "Instagram download failed: missing or invalid cookies. "
+                    "Set the INSTAGRAM_COOKIES environment variable with a valid session cookie and redeploy."
+                )
+            # Handle Instagram extraction failures gracefully by retrying with a generic best format
+            if platform == "Instagram":
+                if is_audio:
+                    # For audio, use best and let ffmpeg extract if available
+                    if ffmpeg_available:
+                        ydl_opts['format'] = 'best'
+                        ydl_opts['postprocessors'] = [{
+                            'key': 'FFmpegExtractAudio',
+                            'preferredcodec': 'mp3',
+                            'preferredquality': '192',
+                        }]
+                    else:
+                        ydl_opts['format'] = 'best'
+                else:
+                    # For video, prefer combined video+audio
+                    if ffmpeg_available:
+                        ydl_opts['format'] = 'bestvideo+bestaudio/best'
+                        ydl_opts['merge_output_format'] = 'mp4'
+                    else:
+                        ydl_opts['format'] = 'best'
+                # Remove any postprocessors that may cause errors for video
+                if not is_audio:
+                    ydl_opts.pop('postprocessors', None)
+                try:
+                    info = ydl.extract_info(url, download=True)
+                except Exception:
+                    info = None
+            # Existing YouTube fallback logic remains unchanged
+            if not info and detect_platform(url) == "YouTube":
+                yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
+                if yt_fallback:
+                    return yt_fallback
+
+            if not info:
+                # If still no info, attempt generic fallback for YouTube again (existing logic)
+                if detect_platform(url) == "YouTube":
+                    yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
+                    if yt_fallback:
+                        return yt_fallback
+                raise e
+            platform = detect_platform(url)
+            # Handle Instagram extraction failures gracefully by retrying with a generic best format
+            if platform == "Instagram":
+                if is_audio:
+                    # For audio, use best and let ffmpeg extract if available
+                    if ffmpeg_available:
+                        ydl_opts['format'] = 'best'
+                        ydl_opts['postprocessors'] = [{
+                            'key': 'FFmpegExtractAudio',
+                            'preferredcodec': 'mp3',
+                            'preferredquality': '192',
+                        }]
+                    else:
+                        ydl_opts['format'] = 'best'
+                else:
+                    # For video, prefer combined video+audio
+                    if ffmpeg_available:
+                        ydl_opts['format'] = 'bestvideo+bestaudio/best'
+                        ydl_opts['merge_output_format'] = 'mp4'
+                    else:
+                        ydl_opts['format'] = 'best'
+                # Remove any existing postprocessors that may cause errors for video
+                if not is_audio:
+                    ydl_opts.pop('postprocessors', None)
+                try:
+                    info = ydl.extract_info(url, download=True)
+                except Exception:
+                    info = None
+            # Existing YouTube fallback logic remains unchanged
+            if not info and detect_platform(url) == "YouTube":
+                yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
+                if yt_fallback:
+                    return yt_fallback
+
+            if not info:
+                # If still no info, attempt generic fallback for YouTube again (existing logic)
+                if detect_platform(url) == "YouTube":
+                    yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
+                    if yt_fallback:
+                        return yt_fallback
+                raise e
+            platform = detect_platform(url)
+            # Handle Instagram extraction failures gracefully by retrying with a generic best format
+            if platform == "Instagram":
+                # Reset format to best available and retry download without metadata processing
+                ydl_opts['format'] = 'best'
+                # Remove postprocessors to avoid ffmpeg errors if not needed
+                ydl_opts.pop('postprocessors', None)
+                try:
+                    info = ydl.extract_info(url, download=True)
+                except Exception:
+                    info = None
+            # Existing YouTube fallback logic remains unchanged
+            if not info and detect_platform(url) == "YouTube":
+                yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
+                if yt_fallback:
+                    return yt_fallback
+
+            if not info:
+                # If still no info, attempt generic fallback for YouTube again (existing logic)
+                if detect_platform(url) == "YouTube":
+                    yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
+                    if yt_fallback:
+                        return yt_fallback
+                raise e
             # If specified format failed (e.g. ffmpeg missing error), retry with safest progressive format
             if "ffmpeg" in str(e).lower() or "merge" in str(e).lower() or "requested format" in str(e).lower():
                 ydl_opts.pop('merge_output_format', None)
