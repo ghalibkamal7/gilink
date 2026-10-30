@@ -690,8 +690,11 @@ def get_media_info(url: str) -> Dict[str, Any]:
 
     # Pass cookies if available (required for Instagram/YouTube on cloud datacenters)
     cookie_file = get_cookies_filepath()
-    ffmpeg_available = has_ffmpeg()
+    if cookie_file:
         ydl_opts['cookiefile'] = cookie_file
+
+    # Determine if ffmpeg binary is available – needed for later logic
+    ffmpeg_available = has_ffmpeg()
 
     proxy = os.environ.get("YOUTUBE_PROXY") or os.environ.get("HTTPS_PROXY") or os.environ.get("HTTP_PROXY")
     if proxy and proxy.strip():
