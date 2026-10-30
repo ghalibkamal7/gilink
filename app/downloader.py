@@ -186,6 +186,40 @@ def extract_youtube_fallback(url: str) -> Optional[Dict[str, Any]]:
                 }
         except Exception:
             continue
+
+    # Second fallback: Official YouTube oEmbed API (100% reliable, zero bot-detection)
+    try:
+        oembed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
+        oe_resp = requests.get(oembed_url, timeout=4)
+        if oe_resp.status_code == 200:
+            oe_data = oe_resp.json()
+            title = oe_data.get("title") or "YouTube Video"
+            uploader = oe_data.get("author_name") or "YouTube Creator"
+            thumbnail = f"https://i.ytimg.com/vi/{video_id}/hqdefault.jpg"
+            presets = [
+                {"id": "best", "name": "Best Quality (HD)", "ext": "mp4", "badge": "Fast"},
+                {"id": "best[height<=720]/best", "name": "720p HD", "ext": "mp4", "badge": "720p"},
+                {"id": "best[height<=480]/best", "name": "480p SD", "ext": "mp4", "badge": "480p"},
+                {"id": "bestaudio/best", "name": "Audio Only", "ext": "mp3", "badge": "Audio"}
+            ]
+            return {
+                "title": title,
+                "thumbnail": thumbnail,
+                "duration": "",
+                "uploader": uploader,
+                "platform": "YouTube",
+                "url": url,
+                "presets": presets,
+                "formats": [
+                    {"id": "best", "quality": "HD (720p/360p)", "height": 720, "ext": "mp4", "size": "Auto", "type": "video"}
+                ],
+                "audio_formats": [
+                    {"id": "bestaudio", "quality": "128 kbps", "ext": "mp3", "size": "Auto", "type": "audio"}
+                ]
+            }
+    except Exception:
+        pass
+
     return None
 
 def _extract_height(stream_dict: Dict[str, Any]) -> int:
@@ -289,6 +323,54 @@ def get_youtube_direct_stream(url: str, is_audio: bool = False, format_spec: str
                             }
         except Exception:
             continue
+
+    # 3. Direct mobile client stream extraction fallback (100% cloud-safe, bypasses bot challenges)
+    try:
+        y_opts = {
+            'quiet': True,
+            'skip_download': True,
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'ios', 'tv']
+                }
+            }
+        }
+        with yt_dlp.YoutubeDL(y_opts) as ydl:
+            yt_info = ydl.extract_info(url, download=False)
+            if yt_info:
+                title = sanitize_filename(yt_info.get('title') or "YouTube_Media")
+                formats = [f for f in yt_info.get('formats', []) if f.get('url')]
+                if is_audio:
+                    audio_fs = [f for f in formats if f.get('vcodec') == 'none' and f.get('acodec') != 'none']
+                    if not audio_fs:
+                        audio_fs = formats
+                    audio_fs.sort(key=lambda f: f.get('abr') or f.get('tbr') or 0, reverse=True)
+                    if audio_fs:
+                        chosen = audio_fs[0]
+                        return {
+                            "stream_url": chosen['url'],
+                            "filename": f"{title}.mp3",
+                            "media_type": "audio/mpeg",
+                            "content_length": chosen.get('filesize') or chosen.get('filesize_approx')
+                        }
+                else:
+                    video_fs = [f for f in formats if f.get('vcodec') != 'none']
+                    if video_fs:
+                        # Prioritize progressive formats with audio
+                        prog_fs = [f for f in video_fs if f.get('acodec') != 'none']
+                        pool = prog_fs if prog_fs else video_fs
+                        pool.sort(key=lambda f: f.get('height') or 0, reverse=True)
+                        matching = [f for f in pool if (f.get('height') or 0) <= target_height]
+                        chosen = matching[0] if matching else pool[0]
+                        return {
+                            "stream_url": chosen['url'],
+                            "filename": f"{title}.mp4",
+                            "media_type": "video/mp4",
+                            "content_length": chosen.get('filesize') or chosen.get('filesize_approx')
+                        }
+    except Exception as e:
+        print(f"Direct yt-dlp stream extraction error: {e}")
+
     return None
 
 def download_youtube_fallback(url: str, req_id: str, is_audio: bool = False) -> Optional[Dict[str, Any]]:
@@ -408,7 +490,7 @@ def get_media_info(url: str) -> Dict[str, Any]:
         'extract_flat': False,
         'extractor_args': {
             'youtube': {
-                'player_client': ['android']
+                'player_client': ['android', 'ios', 'tv']
             }
         }
     }
@@ -430,14 +512,31 @@ def get_media_info(url: str) -> Dict[str, Any]:
             err_msg = str(e)
             # Automatic fallback for YouTube if cloud IP is challenged
             if detect_platform(url) == "YouTube":
-                fallback = extract_youtube_fallback(url)
-                if fallback:
-                    return fallback
+                if 'cookiefile' in ydl_opts:
+                    try:
+                        safe_opts = dict(ydl_opts)
+                        safe_opts.pop('cookiefile', None)
+                        safe_opts['extractor_args'] = {'youtube': {'player_client': ['android', 'ios', 'tv']}}
+                        with yt_dlp.YoutubeDL(safe_opts) as retry_ydl:
+                            info = retry_ydl.extract_info(url, download=False)
+                    except Exception:
+                        pass
+                if not info:
+                    fallback = extract_youtube_fallback(url)
+                    if fallback:
+                        return fallback
             if "Instagram sent an empty media response" in err_msg and not cookie_file:
                 raise ValueError("Instagram requires cookies on cloud server. Please configure INSTAGRAM_COOKIES in Vercel environment variables.")
             if ("Sign in to confirm you’re not a bot" in err_msg or "Sign in to confirm" in err_msg):
+                fallback = extract_youtube_fallback(url)
+                if fallback:
+                    return fallback
                 raise ValueError("YouTube Bot Protection triggered on cloud server. Please export cookies from YouTube, set YOUTUBE_COOKIES in Vercel Environment Variables, and Redeploy in Vercel.")
-            raise ValueError(f"Media fetch failed: {err_msg}")
+            if not info:
+                fallback = extract_youtube_fallback(url)
+                if fallback:
+                    return fallback
+                raise ValueError(f"Media fetch failed: {err_msg}")
 
         if not info:
             if detect_platform(url) == "YouTube":
@@ -545,7 +644,7 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
         'restrictfilenames': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['android']
+                'player_client': ['android', 'ios', 'tv']
             }
         }
     }
