@@ -123,21 +123,22 @@ def get_cookies_filepath() -> Optional[str]:
                 raise e
             err_msg = str(e)
             platform = detect_platform(url)
-            # Instagram authentication required error handling
-            if platform == "Instagram" and "Instagram sent an empty media response" in err_msg:
-                raise ValueError(
-                    "Instagram download failed: missing or invalid cookies. "
-                    "Set the INSTAGRAM_COOKIES environment variable with a valid session cookie and redeploy."
-                )
-            # Handle Instagram extraction failures gracefully by retrying with a generic best format
-            # If Instagram extraction fails, provide a clear error about cookies.
+            # Instagram: try a retry without cookies and with a generic best format.
             if platform == "Instagram":
-                raise ValueError(
-                    "Instagram download failed: missing or invalid cookies. "
-                    "Set the INSTAGRAM_COOKIES environment variable with a valid session cookie and redeploy."
-                )
-            # Re‑raise the original exception for other platforms
-            raise e
+                # Remove any cookiefile that may have been set.
+                ydl_opts.pop('cookiefile', None)
+                ydl_opts['format'] = 'best'
+                # Remove postprocessors that could cause ffmpeg‑related failures.
+                ydl_opts.pop('postprocessors', None)
+                try:
+                    info = ydl.extract_info(url, download=True)
+                except Exception:
+                    # If still fails, we fall back to the generic error handling below.
+                    info = None
+                # If the retry succeeded, the later code will return the info.
+            # For non‑Instagram platforms, re‑raise the original exception.
+            if platform != "Instagram":
+                raise e
             # Existing YouTube fallback logic remains unchanged
             if not info and detect_platform(url) == "YouTube":
                 yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
@@ -712,21 +713,22 @@ def get_media_info(url: str) -> Dict[str, Any]:
                 raise e
             err_msg = str(e)
             platform = detect_platform(url)
-            # Instagram authentication required error handling
-            if platform == "Instagram" and "Instagram sent an empty media response" in err_msg:
-                raise ValueError(
-                    "Instagram download failed: missing or invalid cookies. "
-                    "Set the INSTAGRAM_COOKIES environment variable with a valid session cookie and redeploy."
-                )
-            # Handle Instagram extraction failures gracefully by retrying with a generic best format
-            # If Instagram extraction fails, provide a clear error about cookies.
+            # Instagram: try a retry without cookies and with a generic best format.
             if platform == "Instagram":
-                raise ValueError(
-                    "Instagram download failed: missing or invalid cookies. "
-                    "Set the INSTAGRAM_COOKIES environment variable with a valid session cookie and redeploy."
-                )
-            # Re‑raise the original exception for other platforms
-            raise e
+                # Remove any cookiefile that may have been set.
+                ydl_opts.pop('cookiefile', None)
+                ydl_opts['format'] = 'best'
+                # Remove postprocessors that could cause ffmpeg‑related failures.
+                ydl_opts.pop('postprocessors', None)
+                try:
+                    info = ydl.extract_info(url, download=True)
+                except Exception:
+                    # If still fails, we fall back to the generic error handling below.
+                    info = None
+                # If the retry succeeded, the later code will return the info.
+            # For non‑Instagram platforms, re‑raise the original exception.
+            if platform != "Instagram":
+                raise e
             # Existing YouTube fallback logic remains unchanged
             if not info and detect_platform(url) == "YouTube":
                 yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
@@ -1154,21 +1156,22 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
                 raise e
             err_msg = str(e)
             platform = detect_platform(url)
-            # Instagram authentication required error handling
-            if platform == "Instagram" and "Instagram sent an empty media response" in err_msg:
-                raise ValueError(
-                    "Instagram download failed: missing or invalid cookies. "
-                    "Set the INSTAGRAM_COOKIES environment variable with a valid session cookie and redeploy."
-                )
-            # Handle Instagram extraction failures gracefully by retrying with a generic best format
-            # If Instagram extraction fails, provide a clear error about cookies.
+            # Instagram: try a retry without cookies and with a generic best format.
             if platform == "Instagram":
-                raise ValueError(
-                    "Instagram download failed: missing or invalid cookies. "
-                    "Set the INSTAGRAM_COOKIES environment variable with a valid session cookie and redeploy."
-                )
-            # Re‑raise the original exception for other platforms
-            raise e
+                # Remove any cookiefile that may have been set.
+                ydl_opts.pop('cookiefile', None)
+                ydl_opts['format'] = 'best'
+                # Remove postprocessors that could cause ffmpeg‑related failures.
+                ydl_opts.pop('postprocessors', None)
+                try:
+                    info = ydl.extract_info(url, download=True)
+                except Exception:
+                    # If still fails, we fall back to the generic error handling below.
+                    info = None
+                # If the retry succeeded, the later code will return the info.
+            # For non‑Instagram platforms, re‑raise the original exception.
+            if platform != "Instagram":
+                raise e
             # Existing YouTube fallback logic remains unchanged
             if not info and detect_platform(url) == "YouTube":
                 yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
