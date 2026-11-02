@@ -25,13 +25,29 @@ document.addEventListener('DOMContentLoaded', () => {
   const pasteBtn = document.getElementById('pasteBtn');
   const clearBtn = document.getElementById('clearBtn');
 
+  const setStatus = (iconName, iconClasses, message) => {
+    const icon = document.createElement('i');
+    icon.dataset.lucide = iconName;
+    icon.className = iconClasses;
+    const text = document.createElement('span');
+    text.textContent = message;
+    statusText.replaceChildren(icon, text);
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  };
+
   const updateHistory = (item) => {
     const div = document.createElement('div');
     div.className = 'p-3 rounded-lg bg-slate-800/50 border border-slate-700';
-    div.innerHTML = `<a href="#" class="text-indigo-300 hover:underline" data-url="${item.url}">${item.title}</a> - ${item.platform}`;
+    const link = document.createElement('a');
+    link.href = '#';
+    link.className = 'text-indigo-300 hover:underline';
+    link.textContent = item.title;
+    const platform = document.createElement('span');
+    platform.textContent = ` - ${item.platform}`;
+    div.append(link, platform);
     historyList.prepend(div);
     // click to refill
-    div.querySelector('a').addEventListener('click', (e) => {
+    link.addEventListener('click', (e) => {
       e.preventDefault();
       urlInput.value = item.url;
       fetchMedia();
@@ -63,14 +79,14 @@ document.addEventListener('DOMContentLoaded', () => {
       mediaDuration.textContent = info.duration;
       mediaPlatform.textContent = info.platform;
       // presets
-      formatPresets.innerHTML = '';
+      formatPresets.replaceChildren();
       info.presets.forEach(p => {
         const btn = document.createElement('button');
         btn.className = 'w-full px-3 py-2 text-sm rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition';
         btn.textContent = p.name;
         btn.dataset.format = p.id;
-        btn.dataset.audio = p.ext === "mp3" ? 'true' : 'false';
-        btn.addEventListener('click', () => startDownload(url, p.id, p.ext === "mp3"));
+        btn.dataset.audio = p.is_audio === true || p.ext === "mp3" ? 'true' : 'false';
+        btn.addEventListener('click', () => startDownload(url, p.id, p.is_audio === true || p.ext === "mp3"));
         formatPresets.appendChild(btn);
       });
       mediaCard.classList.remove('hidden');
@@ -88,7 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const startDownload = (url, formatSpec, isAudio) => {
     downloadStatus.classList.remove('hidden');
-    statusText.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin text-indigo-400"></i> Preparing download...`;
+    setStatus('loader-2', 'w-3.5 h-3.5 animate-spin text-indigo-400', 'Preparing download...');
     // trigger download by navigating to the endpoint (browser handles file response)
     const dlUrl = `/api/download?url=${encodeURIComponent(url)}&format_spec=${encodeURIComponent(formatSpec)}&is_audio=${isAudio}`;
     // use hidden iframe to start download without leaving page
@@ -117,5 +133,5 @@ document.addEventListener('DOMContentLoaded', () => {
   // History modal
   historyBtn.addEventListener('click', () => historyModal.classList.remove('hidden'));
   closeHistoryBtn.addEventListener('click', () => historyModal.classList.add('hidden'));
-  clearHistoryBtn.addEventListener('click', () => { historyList.innerHTML = ''; });
+  clearHistoryBtn.addEventListener('click', () => { historyList.replaceChildren(); });
 });

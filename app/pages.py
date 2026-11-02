@@ -61,8 +61,8 @@ def render_layout(
   <meta name="apple-mobile-web-app-title" content="GI LINK" />
   <link rel="manifest" href="/manifest.json" />
   <link rel="apple-touch-icon" href="/icon-192.png" />
-  <link rel="icon" type="image/jpeg" sizes="192x192" href="/icon-192.png" />
-  <link rel="shortcut icon" href="/favicon.ico" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+  <link rel="shortcut icon" type="image/vnd.microsoft.icon" href="/favicon.ico" />
 
   <!-- Resource Preconnects -->
   <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin />
@@ -819,12 +819,30 @@ HOME_SCRIPTS = r"""
     const pasteBtn = document.getElementById('pasteBtn');
     const clearBtn = document.getElementById('clearBtn');
 
+    const setStatus = (iconName, iconClasses, message, messageClasses = '') => {
+      const icon = document.createElement('i');
+      icon.dataset.lucide = iconName;
+      icon.className = iconClasses;
+      const text = document.createElement('span');
+      text.className = messageClasses;
+      text.textContent = message;
+      statusText.replaceChildren(icon, text);
+      if (typeof lucide !== 'undefined') lucide.createIcons();
+    };
+
     const updateHistory = (item) => {
       const div = document.createElement('div');
       div.className = 'p-2 rounded bg-slate-800/50 border border-slate-700/60';
-      div.innerHTML = `<a href="#" class="text-indigo-300 hover:underline line-clamp-1" data-url="${item.url}">${item.title}</a><span class="text-slate-500 text-[10px]">${item.platform}</span>`;
+      const link = document.createElement('a');
+      link.href = '#';
+      link.className = 'text-indigo-300 hover:underline line-clamp-1';
+      link.textContent = item.title;
+      const platform = document.createElement('span');
+      platform.className = 'text-slate-500 text-[10px]';
+      platform.textContent = item.platform;
+      div.append(link, platform);
       historyList.prepend(div);
-      div.querySelector('a').addEventListener('click', (e) => {
+      link.addEventListener('click', (e) => {
         e.preventDefault();
         urlInput.value = item.url;
         fetchMedia();
@@ -851,18 +869,28 @@ HOME_SCRIPTS = r"""
         const data = await resp.json();
         if (!data.success) throw new Error(data.error || 'Failed to retrieve media details.');
         const info = data.data;
-        mediaThumb.src = info.thumbnail || '';
+        try {
+          const thumbnailUrl = new URL(info.thumbnail, window.location.origin);
+          mediaThumb.src = ['http:', 'https:'].includes(thumbnailUrl.protocol) ? thumbnailUrl.href : '';
+        } catch {
+          mediaThumb.removeAttribute('src');
+        }
         mediaTitle.textContent = info.title;
         mediaAuthor.textContent = info.uploader;
         mediaDuration.textContent = info.duration || '';
         mediaPlatform.textContent = info.platform;
-        formatPresets.innerHTML = '';
+        formatPresets.replaceChildren();
 
         info.presets.forEach(p => {
           const btn = document.createElement('button');
           btn.className = 'w-full px-3 py-2 text-xs rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 transition flex items-center justify-between font-medium active:scale-98';
-          btn.innerHTML = `<span>${p.name}</span><span class="text-[10px] text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">${p.badge || p.ext}</span>`;
-          btn.addEventListener('click', () => startDownload(url, p.id, p.ext === 'mp3'));
+          const name = document.createElement('span');
+          name.textContent = p.name;
+          const badge = document.createElement('span');
+          badge.className = 'text-[10px] text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20';
+          badge.textContent = p.badge || p.ext;
+          btn.append(name, badge);
+          btn.addEventListener('click', () => startDownload(url, p.id, p.is_audio === true || p.ext === 'mp3'));
           formatPresets.appendChild(btn);
         });
 
@@ -888,8 +916,7 @@ HOME_SCRIPTS = r"""
       }
       if (statusBytes) statusBytes.textContent = '0.0 MB / ...';
       if (statusRemaining) statusRemaining.textContent = 'Connecting...';
-      statusText.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Requesting media stream...</span>`;
-      if (typeof lucide !== 'undefined') lucide.createIcons();
+      setStatus('loader-2', 'w-3.5 h-3.5 animate-spin', 'Requesting media stream...');
 
       const dlUrl = `/api/download?url=${encodeURIComponent(url)}&format_spec=${encodeURIComponent(formatSpec)}&is_audio=${isAudio}`;
 
@@ -903,7 +930,19 @@ HOME_SCRIPTS = r"""
         const clHeader = res.headers.get('content-length');
         const totalBytes = clHeader ? parseInt(clHeader, 10) : 0;
 
-        let filename = isAudio ? 'audio_download.mp3' : 'media_download.mp4';
+        const mediaType = (res.headers.get('content-type') || 'application/octet-stream').split(';', 1)[0].trim();
+        const extensions = {
+          'audio/aac': 'aac',
+          'audio/mp4': 'm4a',
+          'audio/mpeg': 'mp3',
+          'audio/ogg': 'ogg',
+          'audio/opus': 'opus',
+          'audio/wav': 'wav',
+          'audio/webm': 'webm',
+          'video/mp4': 'mp4',
+          'video/webm': 'webm'
+        };
+        let filename = `${isAudio ? 'audio' : 'media'}_download.${extensions[mediaType] || 'bin'}`;
         const disposition = res.headers.get('content-disposition');
         if (disposition) {
           const rfc5987 = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
@@ -917,8 +956,7 @@ HOME_SCRIPTS = r"""
           }
         }
 
-        statusText.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i><span>Downloading media file...</span>`;
-        if (typeof lucide !== 'undefined') lucide.createIcons();
+        setStatus('loader-2', 'w-3.5 h-3.5 animate-spin', 'Downloading media file...');
 
         const reader = res.body.getReader();
         const chunks = [];
@@ -952,7 +990,7 @@ HOME_SCRIPTS = r"""
           }
         }
 
-        const blob = new Blob(chunks, { type: isAudio ? 'audio/mpeg' : 'video/mp4' });
+        const blob = new Blob(chunks, { type: mediaType });
         const blobUrl = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.style.display = 'none';
@@ -960,8 +998,20 @@ HOME_SCRIPTS = r"""
         a.download = filename;
         document.body.appendChild(a);
         a.click();
-        window.URL.revokeObjectURL(blobUrl);
         a.remove();
+        let fallbackRevokeTimer;
+        let focusRevokeTimer;
+        const revokeBlobUrl = () => {
+          clearTimeout(fallbackRevokeTimer);
+          clearTimeout(focusRevokeTimer);
+          window.removeEventListener('focus', handleDownloadFocus);
+          window.URL.revokeObjectURL(blobUrl);
+        };
+        const handleDownloadFocus = () => {
+          focusRevokeTimer = setTimeout(revokeBlobUrl, 5000);
+        };
+        window.addEventListener('focus', handleDownloadFocus, { once: true });
+        fallbackRevokeTimer = setTimeout(revokeBlobUrl, 60000);
 
         if (statusPercent) statusPercent.textContent = '100%';
         if (statusBar) {
@@ -969,8 +1019,7 @@ HOME_SCRIPTS = r"""
           statusBar.classList.remove('animate-pulse');
         }
         if (statusRemaining) statusRemaining.textContent = 'Saved to device';
-        statusText.innerHTML = `<i data-lucide="check-circle" class="w-3.5 h-3.5 text-emerald-400"></i><span class="text-emerald-400 font-semibold">Download complete!</span>`;
-        if (typeof lucide !== 'undefined') lucide.createIcons();
+        setStatus('check-circle', 'w-3.5 h-3.5 text-emerald-400', 'Download complete!', 'text-emerald-400 font-semibold');
         setTimeout(() => downloadStatus.classList.add('hidden'), 4500);
       } catch (err) {
         if (statusPercent) statusPercent.textContent = 'Error';
@@ -980,8 +1029,7 @@ HOME_SCRIPTS = r"""
           statusBar.className = 'h-full bg-red-500 rounded-full';
         }
         if (statusRemaining) statusRemaining.textContent = '';
-        statusText.innerHTML = `<i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-red-400"></i><span class="text-red-400 font-semibold">${err.message}</span>`;
-        if (typeof lucide !== 'undefined') lucide.createIcons();
+        setStatus('alert-triangle', 'w-3.5 h-3.5 text-red-400', String(err.message || 'Download failed.'), 'text-red-400 font-semibold');
       }
     };
 
@@ -1014,7 +1062,7 @@ HOME_SCRIPTS = r"""
 
     if (historyBtn && historyModal) historyBtn.addEventListener('click', () => historyModal.classList.remove('hidden'));
     if (closeHistoryBtn && historyModal) closeHistoryBtn.addEventListener('click', () => historyModal.classList.add('hidden'));
-    if (clearHistoryBtn && historyList) clearHistoryBtn.addEventListener('click', () => { historyList.innerHTML = ''; });
+    if (clearHistoryBtn && historyList) clearHistoryBtn.addEventListener('click', () => { historyList.replaceChildren(); });
 
     if (typeof lucide !== 'undefined') lucide.createIcons();
   });

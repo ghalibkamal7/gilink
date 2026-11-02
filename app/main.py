@@ -1,5 +1,7 @@
 import os
 import re
+import socket
+import ipaddress
 import urllib.parse
 from typing import Optional, Dict, Any, List
 from pathlib import Path
@@ -9,14 +11,14 @@ from starlette.background import BackgroundTask
 from pydantic import BaseModel
 
 try:
-    from .downloader import get_media_info, download_media, get_youtube_direct_stream, detect_platform
+    from .downloader import get_media_info, download_media, get_youtube_direct_stream, detect_platform, media_type_for_file
 except ImportError:
-    from downloader import get_media_info, download_media, get_youtube_direct_stream, detect_platform
+    from downloader import get_media_info, download_media, get_youtube_direct_stream, detect_platform, media_type_for_file
 
 try:
-    from .icons import get_icon_bytes
+    from .icons import get_icon_bytes, get_favicon_bytes
 except ImportError:
-    from icons import get_icon_bytes
+    from icons import get_icon_bytes, get_favicon_bytes
 
 try:
     from .pages import (
@@ -308,19 +310,33 @@ async def manifest():
     return JSONResponse(content=MANIFEST, media_type="application/manifest+json")
 
 @app.get("/icon-192.png")
-@app.get("/icon-192.jpg")
-async def icon_192():
+async def icon_192_png():
     return Response(
-        content=get_icon_bytes(192),
+        content=get_icon_bytes(192, "png"),
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=86400"}
+    )
+
+@app.get("/icon-192.jpg")
+async def icon_192_jpg():
+    return Response(
+        content=get_icon_bytes(192, "jpg"),
         media_type="image/jpeg",
         headers={"Cache-Control": "public, max-age=86400"}
     )
 
 @app.get("/icon-512.png")
-@app.get("/icon-512.jpg")
-async def icon_512():
+async def icon_512_png():
     return Response(
-        content=get_icon_bytes(512),
+        content=get_icon_bytes(512, "png"),
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=86400"}
+    )
+
+@app.get("/icon-512.jpg")
+async def icon_512_jpg():
+    return Response(
+        content=get_icon_bytes(512, "jpg"),
         media_type="image/jpeg",
         headers={"Cache-Control": "public, max-age=86400"}
     )
@@ -328,8 +344,8 @@ async def icon_512():
 @app.get("/favicon.ico")
 async def favicon():
     return Response(
-        content=get_icon_bytes(192),
-        media_type="image/jpeg",
+        content=get_favicon_bytes(),
+        media_type="image/vnd.microsoft.icon",
         headers={"Cache-Control": "public, max-age=86400"}
     )
 
@@ -391,15 +407,73 @@ async def service_worker():
     )
 
 
-# --- API Routes ---
+# --- API Routes & Security Validation ---
+
+def is_safe_media_url(url: str) -> tuple[bool, str]:
+    """Validates URL against SSRF, loopback, link-local, private, and reserved network addresses."""
+    try:
+        parsed = urllib.parse.urlparse(url)
+    except Exception:
+        return False, "Malformed URL."
+
+    if parsed.scheme.lower() not in ("http", "https"):
+        return False, "Only HTTP and HTTPS URLs are supported."
+
+    if not parsed.netloc:
+        return False, "Missing host domain."
+
+    if "@" in parsed.netloc:
+        return False, "URLs containing user credentials are not allowed."
+
+    hostname = (parsed.hostname or "").strip().lower()
+    if not hostname:
+        return False, "Missing hostname."
+
+    # Direct hostnames representing local/internal networks
+    if hostname in ("localhost", "localtest.me") or hostname.endswith(".local") or hostname.endswith(".internal"):
+        return False, "Access to local network hosts is forbidden."
+
+    # Numeric or IP literal checks (including decimal representations e.g. 2130706433 or hex 0x7f000001)
+    try:
+        ip_val = int(hostname, 0) if (hostname.isdigit() or hostname.startswith("0x")) else hostname
+        ip = ipaddress.ip_address(ip_val)
+        if (ip.is_loopback or ip.is_private or ip.is_link_local or            ip.is_multicast or ip.is_reserved or ip.is_unspecified):
+            return False, "Access to private or local IP addresses is forbidden."
+        return True, ""
+    except ValueError:
+        pass
+
+    # DNS Resolution check to catch DNS rebinding & domains resolving to private/internal IPs
+    try:
+        addr_info = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+        for _, _, _, _, sockaddr in addr_info:
+            ip_str = sockaddr[0]
+            try:
+                ip = ipaddress.ip_address(ip_str)
+                if (ip.is_loopback or ip.is_private or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified):
+                    return False, f"Domain resolves to forbidden private address ({ip_str})."
+            except ValueError:
+                continue
+    except socket.gaierror:
+        # Offline sandbox or temporary DNS resolution failure: allowed if domain format is valid
+        pass
+    except Exception as e:
+        return False, f"URL validation failed: {str(e)}"
+
+    return True, ""
 
 @app.post("/api/info")
 async def fetch_info(req: InfoRequest):
     url = req.url.strip()
     if not url:
-        raise HTTPException(status_code=400, detail="URL cannot be empty")
+        return JSONResponse(status_code=400, content={"success": False, "error": "URL cannot be empty."})
     if not (url.startswith("http://") or url.startswith("https://")):
         url = "https://" + url
+
+    safe, err_reason = is_safe_media_url(url)
+    if not safe:
+        return JSONResponse(status_code=400, content={"success": False, "error": f"Invalid URL: {err_reason}"})
+
     try:
         data = get_media_info(url)
         return JSONResponse(content={"success": True, "data": data})
@@ -488,10 +562,16 @@ async def trigger_download(
 ):
     url = url.strip()
     if not url:
-        raise HTTPException(status_code=400, detail="Invalid URL")
+        raise HTTPException(status_code=400, detail="Invalid URL: URL cannot be empty.")
+    if not (url.startswith("http://") or url.startswith("https://")):
+        url = "https://" + url
+
+    safe, err_reason = is_safe_media_url(url)
+    if not safe:
+        raise HTTPException(status_code=400, detail=f"Invalid URL: {err_reason}")
 
     # Fast direct streaming proxy for YouTube to bypass datacenter IP restrictions
-    if detect_platform(url) == "YouTube":
+    if detect_platform(url) == "YouTube" and not is_audio:
         direct = get_youtube_direct_stream(url, is_audio=is_audio, format_spec=format_spec)
         if direct:
             direct_resp = make_direct_stream_response(direct)
@@ -504,7 +584,7 @@ async def trigger_download(
         filename = result["filename"]
         filesize = result.get("filesize") or (os.path.getsize(filepath) if os.path.exists(filepath) else 0)
 
-        media_type = "audio/mpeg" if is_audio else "video/mp4"
+        media_type = media_type_for_file(filename, is_audio)
 
         safe_ascii_filename = re.sub(r'[^\x20-\x7E]', '_', filename).replace('"', '').replace(';', '')
         if not safe_ascii_filename.strip():
@@ -520,11 +600,12 @@ async def trigger_download(
         return StreamingResponse(
             file_iterator(filepath),
             media_type=media_type,
-            headers=headers
+            headers=headers,
+            background=BackgroundTask(remove_temp_file, filepath)
         )
     except Exception as e:
         # Final safety net for YouTube if bot detection still triggers
-        if detect_platform(url) == "YouTube":
+        if detect_platform(url) == "YouTube" and not is_audio:
             direct = get_youtube_direct_stream(url, is_audio=is_audio, format_spec=format_spec)
             if direct:
                 direct_resp = make_direct_stream_response(direct)
@@ -537,13 +618,18 @@ async def trigger_download(
                 status_code=403,
                 detail="YouTube has blocked this cloud server IP (Bot Protection). To fix this, export cookies from YouTube and set YOUTUBE_COOKIES in Vercel Environment Variables, exactly like Instagram cookies."
             )
+        if "Instagram requires" in err_msg or "INSTAGRAM_COOKIES" in err_msg:
+            raise HTTPException(
+                status_code=403,
+                detail=err_msg
+            )
         raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
 
 @app.get("/api/health")
 async def health():
     yt_c = os.environ.get("YOUTUBE_COOKIES") or ""
     ig_c = os.environ.get("INSTAGRAM_COOKIES") or ""
-    from .downloader import get_cookies_filepath
+    from .downloader import get_cookies_filepath, has_ffmpeg
     ck_path = get_cookies_filepath()
     ck_lines = 0
     if ck_path and os.path.exists(ck_path):
@@ -553,6 +639,7 @@ async def health():
         "status": "ok",
         "app": "GI LINK Media Downloader",
         "version": "1.1.0",
+        "ffmpeg_available": has_ffmpeg(),
         "yt_cookies_configured": bool(yt_c.strip()),
         "yt_cookies_char_length": len(yt_c.strip()),
         "ig_cookies_configured": bool(ig_c.strip()),
