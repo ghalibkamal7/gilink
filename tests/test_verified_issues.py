@@ -9,6 +9,7 @@ from app import main
 from app.downloader import (
     DOWNLOAD_DIR,
     audio_preset,
+    download_media,
     download_youtube_fallback,
     extension_from_mime_type,
     media_type_for_file,
@@ -99,6 +100,51 @@ class TestVerifiedIssues(unittest.TestCase):
             self.assertIn("sample.webm", response.headers["content-disposition"])
         finally:
             main.remove_temp_file(filepath)
+
+    def test_video_presets_select_audio_video_muxing_with_ffmpeg(self):
+        for format_spec, expected_format in (
+            ("best", "bestvideo+bestaudio/best"),
+            ("18", "18/best[acodec!=none][vcodec!=none]/bestvideo+bestaudio/best"),
+        ):
+            with self.subTest(format_spec=format_spec):
+                with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as media:
+                    media.write(b"video and audio")
+                    filepath = media.name
+
+                class FakeYoutubeDL:
+                    options = []
+                    downloads = []
+
+                    def __init__(self, options):
+                        self.options.append(options)
+
+                    def __enter__(self):
+                        return self
+
+                    def __exit__(self, *_args):
+                        return False
+
+                    def extract_info(self, _url, download):
+                        self.downloads.append(download)
+                        return {"title": "sample"}
+
+                    def prepare_filename(self, _info):
+                        return filepath
+
+                try:
+                    FakeYoutubeDL.options = []
+                    FakeYoutubeDL.downloads = []
+                    with patch("app.downloader.yt_dlp.YoutubeDL", FakeYoutubeDL), \
+                         patch("app.downloader.has_ffmpeg", return_value=True), \
+                         patch("app.downloader.get_cookies_filepath", return_value=None):
+                        result = download_media("https://example.com/video", format_spec)
+
+                    self.assertEqual(FakeYoutubeDL.options[0]["format"], expected_format)
+                    self.assertEqual(FakeYoutubeDL.options[0]["merge_output_format"], "mp4")
+                    self.assertTrue(FakeYoutubeDL.downloads[0])
+                    self.assertTrue(os.path.exists(result["filepath"]))
+                finally:
+                    main.remove_temp_file(filepath)
 
     def test_icon_routes_match_file_signatures_and_content_types(self):
         async def get_response(handler):

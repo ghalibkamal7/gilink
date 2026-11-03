@@ -860,8 +860,15 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
         if platform == "Instagram":
             # Instagram reels usually have pre-muxed audio and video in best format
             ydl_opts['format'] = 'best'
-        elif ffmpeg_available and ("+" in format_spec):
-            ydl_opts['format'] = format_spec
+        elif ffmpeg_available:
+            if format_spec == "best":
+                ydl_opts['format'] = 'bestvideo+bestaudio/best'
+            elif format_spec == "18":
+                ydl_opts['format'] = '18/best[acodec!=none][vcodec!=none]/bestvideo+bestaudio/best'
+            elif "+" in format_spec:
+                ydl_opts['format'] = format_spec
+            else:
+                ydl_opts['format'] = f'{format_spec}+bestaudio/{format_spec}/bestvideo+bestaudio/best'
             ydl_opts['merge_output_format'] = 'mp4'
         else:
             # Fallback to single progressive stream with audio (format 22 or 18)
