@@ -243,7 +243,7 @@ def extract_youtube_fallback(url: str) -> Optional[Dict[str, Any]]:
         except Exception:
             continue
 
-    # Second fallback: Official YouTube oEmbed API (100% reliable, zero bot-detection)
+    # YouTube oEmbed fallback provides basic public metadata when extraction is blocked.
     try:
         oembed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
         oe_resp = requests.get(oembed_url, timeout=4)
@@ -906,6 +906,9 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
         elif platform == "YouTube":
             # If ffmpeg failed or format unavailable, retry progressive
             if "ffmpeg" in err_msg.lower() or "merge" in err_msg.lower() or "requested format" in err_msg.lower():
+                if is_audio:
+                    cleanup_temp_req_files(req_id)
+                    raise ValueError("MP3 conversion could not be completed. Please try another public media link.") from e
                 prog_opts = dict(ydl_opts)
                 prog_opts.pop('merge_output_format', None)
                 prog_opts.pop('postprocessors', None)
@@ -924,6 +927,9 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
         else:
             # For other platforms, if ffmpeg postprocessor failed, retry without it
             if "ffmpeg" in err_msg.lower() or "requested format" in err_msg.lower():
+                if is_audio:
+                    cleanup_temp_req_files(req_id)
+                    raise ValueError("MP3 conversion could not be completed. Please try another public media link.") from e
                 prog_opts = dict(ydl_opts)
                 prog_opts.pop('merge_output_format', None)
                 prog_opts.pop('postprocessors', None)

@@ -1,1 +1,1 @@
-# Package initializer for OmniDrop
+"""GI LINK FastAPI application package."""

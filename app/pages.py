@@ -1,12 +1,10 @@
-"""
-HTML Pages and Layout templates for GI LINK.
-Engineered for Technical SEO, Semantic Accessibility, Performance, and AdSense readiness.
-"""
+"""Server-rendered pages for GI LINK."""
 
 import json
 from typing import Optional
 
 BASE_URL = "https://gilinkdl.vercel.app"
+
 
 def render_layout(
     title: str,
@@ -14,1101 +12,316 @@ def render_layout(
     canonical_path: str,
     content_html: str,
     schema_json: Optional[dict] = None,
-    extra_scripts: str = ""
+    extra_scripts: str = '<script src="/static/app.js" defer></script>',
 ) -> str:
     canonical_url = f"{BASE_URL}{canonical_path}"
-    og_image = f"{BASE_URL}/icon-512.png"
-
     schema_tag = ""
     if schema_json:
-        schema_tag = f'<script type="application/ld+json">{json.dumps(schema_json, ensure_ascii=False)}</script>'
+        schema = json.dumps(schema_json, ensure_ascii=False).replace("<", "\\u003c")
+        schema_tag = f'<script type="application/ld+json">{schema}</script>'
+    history_action = (
+        '<button class="history-trigger" id="historyBtn" type="button">History</button>'
+        if not canonical_path else ""
+    )
 
-    return f"""<!DOCTYPE html>
-<html lang="en" class="dark">
+    return f"""<!doctype html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f8fa">
+  <meta name="description" content="{description}">
+  <meta name="robots" content="index,follow">
+  <meta name="google-site-verification" content="Du_RVrnTwPBjSXPQjQ-RlDluCuEo0A4QMPz9vAWXjDY">
+  <meta name="google-adsense-account" content="ca-pub-6837969928640726">
+  <link rel="canonical" href="{canonical_url}">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{canonical_url}">
+  <meta property="og:title" content="{title}">
+  <meta property="og:description" content="{description}">
+  <meta property="og:image" content="{BASE_URL}/icon-512.png">
+  <meta property="og:site_name" content="GI LINK">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="{title}">
+  <meta name="twitter:description" content="{description}">
+  <meta name="twitter:image" content="{BASE_URL}/icon-512.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="/static/style.css">
   <title>{title}</title>
-  <meta name="description" content="{description}" />
-  <meta name="keywords" content="video downloader, reels downloader, instagram reel download, mp4 downloader, audio extractor, online media downloader, GI LINK, free video download" />
-  <meta name="author" content="Ghalib Kamal" />
-  <meta name="robots" content="index, follow" />
-  <meta name="google-site-verification" content="Du_RVrnTwPBjSXPQjQ-RlDluCuEo0A4QMPz9vAWXjDY" />
-  <meta name="google-adsense-account" content="ca-pub-6837969928640726" />
-  <link rel="canonical" href="{canonical_url}" />
-
-  <!-- Open Graph / Facebook -->
-  <meta property="og:type" content="website" />
-  <meta property="og:url" content="{canonical_url}" />
-  <meta property="og:title" content="{title}" />
-  <meta property="og:description" content="{description}" />
-  <meta property="og:image" content="{og_image}" />
-  <meta property="og:site_name" content="GI LINK" />
-  <meta property="og:locale" content="en_US" />
-
-  <!-- Twitter / X Cards -->
-  <meta name="twitter:card" content="summary" />
-  <meta name="twitter:url" content="{canonical_url}" />
-  <meta name="twitter:title" content="{title}" />
-  <meta name="twitter:description" content="{description}" />
-  <meta name="twitter:image" content="{og_image}" />
-  <meta name="twitter:creator" content="@ghalibkamal" />
-
-  <!-- PWA & Mobile Meta Tags -->
-  <meta name="theme-color" content="#090d16" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="GI LINK" />
-  <link rel="manifest" href="/manifest.json" />
-  <link rel="apple-touch-icon" href="/icon-192.png" />
-  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
-  <link rel="shortcut icon" type="image/vnd.microsoft.icon" href="/favicon.ico" />
-
-  <!-- Resource Preconnects -->
-  <link rel="preconnect" href="https://cdn.tailwindcss.com" crossorigin />
-  <link rel="preconnect" href="https://unpkg.com" crossorigin />
-
-  <!-- CSS & Icons -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/lucide@latest"></script>
-
   {schema_tag}
-
-  <style>
-    body {{
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      text-rendering: optimizeLegibility;
-      -webkit-font-smoothing: antialiased;
-    }}
-    @keyframes fadeIn {{
-      from {{ opacity: 0; transform: translateY(6px); }}
-      to {{ opacity: 1; transform: translateY(0); }}
-    }}
-    .animate-fadeIn {{ animation: fadeIn 0.25s ease-out forwards; }}
-    details > summary {{ list-style: none; }}
-    details > summary::-webkit-details-marker {{ display: none; }}
-    details[open] summary svg {{ transform: rotate(180deg); }}
-  </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white">
-
-  <!-- Ambient Glow Background -->
-  <div class="fixed inset-0 overflow-hidden pointer-events-none -z-10" aria-hidden="true">
-    <div class="absolute -top-32 left-1/2 -translate-x-1/2 w-[600px] h-[350px] bg-gradient-to-tr from-indigo-600/20 via-purple-600/20 to-pink-500/15 blur-[120px] rounded-full"></div>
-  </div>
-
-  <!-- Main Header & Navigation -->
-  <header class="border-b border-slate-800/80 backdrop-blur-md bg-slate-950/85 sticky top-0 z-50">
-    <div class="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
-      <a href="/" class="flex items-center space-x-2.5 group" aria-label="GI LINK Home">
-        <img src="/icon-192.png" alt="GI LINK Logo" class="w-8 h-8 rounded-lg shadow-md shadow-indigo-500/30 object-cover group-hover:scale-105 transition" width="32" height="32" />
-        <span class="text-lg font-black tracking-tight bg-gradient-to-r from-white via-slate-100 to-indigo-300 bg-clip-text text-transparent">GI LINK</span>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="/" aria-label="GI LINK home">
+        <span class="brand-mark" aria-hidden="true">gi</span>
+        <span>GI<span class="brand-light">LINK</span></span>
       </a>
-
-      <!-- Desktop Nav Links -->
-      <nav class="hidden md:flex items-center space-x-5 text-xs font-medium text-slate-300" aria-label="Main Navigation">
-        <a href="/" class="hover:text-indigo-400 transition">Downloader</a>
-        <a href="/#how-it-works" class="hover:text-indigo-400 transition">How It Works</a>
-        <a href="/#faq" class="hover:text-indigo-400 transition">FAQ</a>
-        <a href="/about" class="hover:text-indigo-400 transition">About</a>
-        <a href="/contact" class="hover:text-indigo-400 transition">Contact</a>
+      <button class="menu-toggle" id="menuToggle" type="button" aria-expanded="false" aria-controls="primaryNav" aria-label="Open menu">
+        <span></span><span></span>
+      </button>
+      <nav class="primary-nav" id="primaryNav" aria-label="Main navigation">
+        <a href="/">Home</a>
+        <a href="/#platforms">Platforms</a>
+        <a href="/#how-it-works">How it works</a>
+        <a href="/about">About</a>
+        <a href="/contact">Contact</a>
+        {history_action}
+        <a class="nav-cta" href="/#downloader">Download media <span aria-hidden="true">↗</span></a>
       </nav>
-
-      <!-- Action Buttons -->
-      <div class="flex items-center space-x-2">
-        <button id="installBtn" class="hidden items-center space-x-1 text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1.5 rounded-lg transition font-medium shadow-sm" aria-label="Install App">
-          <i data-lucide="download-cloud" class="w-3.5 h-3.5" aria-hidden="true"></i>
-          <span>Install</span>
-        </button>
-        <button id="historyBtn" class="flex items-center space-x-1 text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1.5 rounded-lg transition border border-slate-700" aria-label="View Download History">
-          <i data-lucide="history" class="w-3.5 h-3.5" aria-hidden="true"></i>
-          <span class="hidden sm:inline">History</span>
-        </button>
-      </div>
     </div>
   </header>
-
-  <!-- Content Container -->
   {content_html}
-
-  <!-- Global Footer -->
-  <footer class="border-t border-slate-800/70 py-8 bg-slate-950/90 text-slate-400 text-xs mt-auto">
-    <div class="max-w-4xl mx-auto px-4 flex flex-col items-center space-y-4">
-      <div class="flex flex-wrap justify-center gap-x-6 gap-y-2 text-slate-400 text-[13px]">
-        <a href="/" class="hover:text-indigo-400 transition">Home</a>
-        <a href="/#how-it-works" class="hover:text-indigo-400 transition">How It Works</a>
-        <a href="/#faq" class="hover:text-indigo-400 transition">FAQ</a>
-        <a href="/about" class="hover:text-indigo-400 transition">About Us</a>
-        <a href="/privacy" class="hover:text-indigo-400 transition">Privacy Policy</a>
-        <a href="/terms" class="hover:text-indigo-400 transition">Terms of Service</a>
-        <a href="/dmca" class="hover:text-indigo-400 transition">DMCA / Disclaimer</a>
-        <a href="/contact" class="hover:text-indigo-400 transition">Contact</a>
+  <footer class="site-footer">
+    <div class="container footer-main">
+      <div class="footer-brand">
+        <a class="brand" href="/" aria-label="GI LINK home">
+          <span class="brand-mark" aria-hidden="true">gi</span>
+          <span>GI<span class="brand-light">LINK</span></span>
+        </a>
+        <p>Tools for working with public media links.</p>
       </div>
-
-      <div class="text-center text-[11px] text-slate-500 max-w-2xl leading-relaxed">
-        <p class="mb-1">&copy; 2026 GI LINK. Fast, Private &amp; Universal Media Downloader.</p>
-        <p class="mb-1.5">Created by <a href="/about" class="text-indigo-400 hover:underline font-medium">Ghalib Kamal</a></p>
-        <p class="text-[10px] text-slate-600">
-          Disclaimer: GI LINK is an educational tool designed for personal, fair-use downloading of user-owned or public content. We do not host or archive media files on our servers. All rights belong to their respective copyright owners.
-        </p>
-      </div>
+      <nav class="footer-nav" aria-label="Footer navigation">
+        <a href="/about">About</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="/dmca">Copyright</a>
+        <a href="/contact">Contact</a>
+        <a href="https://github.com/ghalibkamal7/gilink" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span></a>
+      </nav>
+    </div>
+    <div class="container footer-bottom">
+      <span>© 2026 GI LINK</span>
+      <span>Only download media you have permission to use.</span>
     </div>
   </footer>
-
   {extra_scripts}
 </body>
 </html>"""
 
 
-# ==============================================================================
-# HOMEPAGE CONTENT WITH TOOL & RICH SEO SECTIONS
-# ==============================================================================
-
 def get_home_html() -> str:
     return """
-  <!-- Main Downloader Container -->
-  <main class="flex-1 max-w-3xl mx-auto px-3.5 py-6 sm:py-9 w-full">
-    
-    <!-- Hero Title -->
-    <div class="text-center space-y-2 mb-6">
-      <h1 class="text-2xl sm:text-4xl font-extrabold tracking-tight text-white">
-        Download <span class="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">Video &amp; Audio</span> Online
-      </h1>
-      <p class="text-xs sm:text-sm text-slate-400 max-w-lg mx-auto">
-        Fast, high-quality media extractor for Instagram Reels, YouTube, TikTok, Facebook, Twitter/X, and 1000+ platforms.
-      </p>
-    </div>
-
-    <!-- URL Input Card -->
-    <div class="bg-slate-900/95 border border-slate-800 rounded-xl p-2.5 sm:p-3 shadow-xl backdrop-blur-md">
-      <form id="urlForm" class="flex flex-col sm:flex-row items-stretch gap-2">
-        <div class="relative flex-1">
-          <label for="urlInput" class="sr-only">Paste video or media link</label>
-          <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500">
-            <i data-lucide="link-2" class="w-4 h-4" aria-hidden="true"></i>
-          </div>
-          <input 
-            type="url" 
-            id="urlInput"
-            name="url"
-            placeholder="Paste video or reel link here..." 
-            required
-            aria-label="Paste video or reel URL"
-            class="w-full bg-slate-950 border border-slate-700/80 rounded-lg pl-9 pr-20 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm"
-          />
-          <div class="absolute inset-y-0 right-1 flex items-center space-x-1">
-            <button 
-              type="button" 
-              id="pasteBtn"
-              title="Paste from clipboard"
-              aria-label="Paste URL from clipboard"
-              class="px-2 py-1 text-xs font-medium rounded-md bg-slate-800 text-slate-300 hover:text-white transition flex items-center space-x-1 border border-slate-700"
-            >
-              <i data-lucide="clipboard" class="w-3 h-3" aria-hidden="true"></i>
-              <span>Paste</span>
-            </button>
-            <button 
-              type="button" 
-              id="clearBtn"
-              title="Clear input"
-              aria-label="Clear input field"
-              class="hidden p-1 text-slate-400 hover:text-white rounded"
-            >
-              <i data-lucide="x" class="w-3.5 h-3.5" aria-hidden="true"></i>
-            </button>
+  <main id="main">
+    <section class="hero">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="eyebrow-dot"></span> A straightforward media tool</p>
+          <h1>Bring your media<br><span>with you.</span></h1>
+          <p class="hero-description">Get a downloadable file from a public video or audio link. Choose an available format and save it to your device.</p>
+          <div class="trust-notes">
+            <span><span class="check-mark">✓</span> No account required</span>
+            <span><span class="check-mark">✓</span> Choose the file format</span>
           </div>
         </div>
 
-        <button 
-          type="submit" 
-          id="fetchBtn"
-          aria-label="Fetch Media Details"
-          class="px-5 py-2.5 rounded-lg font-bold text-sm text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-md transition active:scale-95 flex items-center justify-center space-x-1.5 shrink-0"
-        >
-          <i data-lucide="search" class="w-4 h-4" id="fetchIcon" aria-hidden="true"></i>
-          <span id="fetchText">Fetch</span>
-          <div id="fetchSpinner" class="hidden w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" aria-hidden="true"></div>
-        </button>
-      </form>
-    </div>
-
-    <!-- Supported Platforms Pills -->
-    <div class="mt-3.5 flex flex-wrap items-center justify-center gap-1.5 text-xs text-slate-400" aria-label="Supported Platforms">
-      <span class="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 flex items-center space-x-1">
-        <i data-lucide="instagram" class="w-3 h-3 text-pink-500" aria-hidden="true"></i>
-        <span>Instagram Reels</span>
-      </span>
-      <span class="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 flex items-center space-x-1">
-        <i data-lucide="youtube" class="w-3 h-3 text-red-500" aria-hidden="true"></i>
-        <span>YouTube</span>
-      </span>
-      <span class="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 flex items-center space-x-1">
-        <i data-lucide="video" class="w-3 h-3 text-cyan-400" aria-hidden="true"></i>
-        <span>TikTok</span>
-      </span>
-      <span class="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 flex items-center space-x-1">
-        <i data-lucide="facebook" class="w-3 h-3 text-blue-500" aria-hidden="true"></i>
-        <span>Facebook</span>
-      </span>
-      <span class="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 flex items-center space-x-1">
-        <i data-lucide="twitter" class="w-3 h-3 text-slate-300" aria-hidden="true"></i>
-        <span>X / Twitter</span>
-      </span>
-    </div>
-
-    <!-- Media Details Card -->
-    <section id="mediaCard" class="hidden mt-4 bg-slate-900 border border-slate-800 rounded-xl p-3.5 shadow-xl animate-fadeIn" aria-live="polite">
-      <div class="flex flex-col sm:flex-row gap-3.5">
-        <!-- Thumbnail -->
-        <div class="relative w-full sm:w-44 aspect-video sm:aspect-square max-h-48 bg-slate-950 rounded-lg overflow-hidden shrink-0 border border-slate-800 flex items-center justify-center">
-          <img id="mediaThumb" src="" alt="Media thumbnail preview" class="w-full h-full object-cover" />
-          <span id="mediaDuration" class="absolute bottom-1.5 right-1.5 bg-black/80 text-[10px] font-mono px-1.5 py-0.5 rounded text-white font-medium"></span>
-          <span id="mediaPlatform" class="absolute top-1.5 left-1.5 bg-indigo-600/90 text-[10px] font-semibold px-2 py-0.5 rounded text-white shadow"></span>
-        </div>
-
-        <!-- Info & Formats -->
-        <div class="flex-1 flex flex-col justify-between">
-          <div>
-            <h3 id="mediaTitle" class="text-sm sm:text-base font-bold text-white line-clamp-2 leading-snug"></h3>
-            <p id="mediaAuthor" class="text-xs text-slate-400 mt-1 flex items-center space-x-1">
-              <i data-lucide="user" class="w-3.5 h-3.5 text-slate-500" aria-hidden="true"></i>
-              <span id="authorText">Creator</span>
-            </p>
-          </div>
-
-          <!-- Format Selection -->
-          <div class="mt-3">
-            <span class="text-[11px] uppercase font-bold text-slate-400 tracking-wider">Choose Download Option:</span>
-            <div id="formatPresets" class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-1.5">
-              <!-- Preset buttons inserted dynamically -->
+        <section class="download-panel" id="downloader" aria-labelledby="download-title">
+          <div class="panel-heading">
+            <span class="panel-step">01</span>
+            <div>
+              <h2 id="download-title">Start with a link</h2>
+              <p>Paste a public media URL to see available downloads.</p>
             </div>
           </div>
-
-          <!-- Action Status / Progress Bar -->
-          <div id="downloadStatus" class="hidden mt-2.5 p-3 rounded-lg bg-slate-950 border border-slate-800" role="status">
-            <div id="statusContainer">
-              <div class="flex items-center justify-between text-xs text-slate-300 mb-1.5">
-                <span id="statusText" class="font-medium flex items-center space-x-1.5 text-indigo-300">
-                  <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin" aria-hidden="true"></i>
-                  <span>Downloading media file...</span>
-                </span>
-                <span id="statusPercent" class="font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20 text-[11px] font-mono">0%</span>
+          <form id="urlForm" novalidate>
+            <label for="urlInput">Media URL</label>
+            <div class="url-control" id="urlControl">
+              <span class="url-symbol" aria-hidden="true">↗</span>
+              <input id="urlInput" name="url" type="url" inputmode="url" autocomplete="url" placeholder="https://www.youtube.com/…" required aria-describedby="urlHint formError">
+              <button class="paste-button" id="pasteBtn" type="button">Paste</button>
+            </div>
+            <p class="field-hint" id="urlHint">Use a public link to a post or media page.</p>
+            <p class="form-error" id="formError" role="alert" hidden></p>
+            <button class="button button-primary submit-button" id="fetchBtn" type="submit">
+              <span class="button-label">Find downloads</span>
+              <span class="button-spinner" aria-hidden="true"></span>
+              <span aria-hidden="true">→</span>
+            </button>
+          </form>
+          <p class="panel-footnote"><span aria-hidden="true">i</span> GI LINK only works with content you’re authorized to download.</p>
+          <section class="result-panel" id="mediaCard" aria-live="polite" hidden>
+            <div class="result-header">
+              <div class="thumbnail-wrap">
+                <img id="mediaThumb" alt="" hidden>
+                <span class="thumbnail-fallback" id="thumbnailFallback" aria-hidden="true">GI</span>
               </div>
-              <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden mb-1.5">
-                <div id="statusBar" class="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-150" style="width: 0%"></div>
-              </div>
-              <div class="flex items-center justify-between text-[11px] text-slate-400 font-mono">
-                <span id="statusBytes">0.0 MB / 0.0 MB</span>
-                <span id="statusRemaining" class="text-amber-300/90 font-medium">Connecting...</span>
+              <div class="result-meta">
+                <p class="result-platform" id="mediaPlatform"></p>
+                <h3 id="mediaTitle"></h3>
+                <p class="result-byline" id="mediaByline"></p>
               </div>
             </div>
-          </div>
-
-        </div>
+            <div class="result-options">
+              <div class="options-heading">
+                <h3>Available downloads</h3>
+                <span id="formatCount"></span>
+              </div>
+              <div id="formatPresets" class="format-list"></div>
+            </div>
+            <p class="download-status" id="downloadStatus" role="status" hidden></p>
+          </section>
+          <section class="error-panel" id="errorCard" role="alert" hidden>
+            <span class="error-indicator" aria-hidden="true">!</span>
+            <div><h3>Couldn’t load that link</h3><p id="errorMessage"></p></div>
+          </section>
+        </section>
+      </div>
+      <div class="hero-bottom container">
+        <span>Public links only</span><span>Files processed on request</span><span>Formats shown before download</span>
       </div>
     </section>
 
-    <!-- Error Alert Card -->
-    <div id="errorCard" class="hidden mt-3.5 p-3 rounded-lg bg-red-950/40 border border-red-800/60 text-red-200 text-xs flex items-start space-x-2" role="alert">
-      <i data-lucide="alert-circle" class="w-4 h-4 text-red-400 shrink-0 mt-0.5" aria-hidden="true"></i>
-      <div>
-        <p class="font-semibold text-red-300" id="errorTitle">Fetch Error</p>
-        <p class="text-red-200/80 mt-0.5" id="errorMessage">Could not fetch video. Please check link.</p>
-      </div>
-    </div>
-
-    <!-- Informational SEO Section 1: How It Works -->
-    <section id="how-it-works" class="mt-12 pt-8 border-t border-slate-800/60">
-      <div class="text-center mb-6">
-        <h2 class="text-lg sm:text-2xl font-bold text-white tracking-tight">How to Download Videos &amp; Reels with GI LINK</h2>
-        <p class="text-xs sm:text-sm text-slate-400 mt-1">Extract high-resolution media in three effortless steps</p>
-      </div>
-
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 flex flex-col items-center text-center">
-          <div class="w-10 h-10 rounded-lg bg-indigo-600/20 text-indigo-400 flex items-center justify-center font-bold text-lg mb-3 border border-indigo-500/30">1</div>
-          <h3 class="font-semibold text-white text-sm mb-1">Copy the Video URL</h3>
-          <p class="text-xs text-slate-400 leading-relaxed">Open your favorite social app (Instagram, YouTube, TikTok) and copy the shareable video or reel link.</p>
+    <section class="section platforms-section" id="platforms">
+      <div class="container">
+        <div class="section-heading">
+          <p class="eyebrow">SUPPORTED SOURCES</p>
+          <h2>Works with links from</h2>
+          <p>Support depends on the public page and the source platform’s availability.</p>
         </div>
-
-        <div class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 flex flex-col items-center text-center">
-          <div class="w-10 h-10 rounded-lg bg-purple-600/20 text-purple-400 flex items-center justify-center font-bold text-lg mb-3 border border-purple-500/30">2</div>
-          <h3 class="font-semibold text-white text-sm mb-1">Paste into GI LINK</h3>
-          <p class="text-xs text-slate-400 leading-relaxed">Paste the link into the search box above and tap <strong>Fetch</strong>. Our engine instantly analyzes stream qualities.</p>
-        </div>
-
-        <div class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 flex flex-col items-center text-center">
-          <div class="w-10 h-10 rounded-lg bg-pink-600/20 text-pink-400 flex items-center justify-center font-bold text-lg mb-3 border border-pink-500/30">3</div>
-          <h3 class="font-semibold text-white text-sm mb-1">Save HD MP4 or MP3</h3>
-          <p class="text-xs text-slate-400 leading-relaxed">Select your preferred resolution (1080p, 720p, or Audio) to save the media file directly to your device.</p>
-        </div>
+        <ul class="platform-list" aria-label="Supported media sources">
+          <li><span class="platform-glyph youtube">▶</span>YouTube</li>
+          <li><span class="platform-glyph instagram">◎</span>Instagram</li>
+          <li><span class="platform-glyph tiktok">♪</span>TikTok</li>
+          <li><span class="platform-glyph facebook">f</span>Facebook</li>
+          <li><span class="platform-glyph x-mark">𝕏</span>X</li>
+          <li><span class="platform-glyph reddit">r/</span>Reddit</li>
+          <li><span class="platform-glyph pinterest">p</span>Pinterest</li>
+          <li><span class="platform-glyph vimeo">v</span>Vimeo</li>
+          <li><span class="platform-glyph soundcloud">≋</span>SoundCloud</li>
+        </ul>
       </div>
     </section>
 
-    <!-- Informational SEO Section 2: Core Features -->
-    <section class="mt-10 pt-8 border-t border-slate-800/60">
-      <div class="text-center mb-6">
-        <h2 class="text-lg sm:text-2xl font-bold text-white tracking-tight">Why Choose GI LINK?</h2>
-        <p class="text-xs sm:text-sm text-slate-400 mt-1">Built for speed, user privacy, and zero complications</p>
-      </div>
-
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
-        <div class="p-3.5 bg-slate-900/50 border border-slate-800/70 rounded-lg">
-          <div class="flex items-center space-x-2.5 mb-1.5">
-            <i data-lucide="zap" class="w-4 h-4 text-amber-400" aria-hidden="true"></i>
-            <h3 class="font-bold text-white text-sm">Ultra Fast Extraction</h3>
-          </div>
-          <p class="text-slate-400 leading-relaxed">Powered by modern high-throughput serverless pipelines, parsing media streams in seconds.</p>
+    <section class="section how-section" id="how-it-works">
+      <div class="container how-grid">
+        <div class="section-heading how-intro">
+          <p class="eyebrow">A SIMPLE WORKFLOW</p>
+          <h2>From link<br>to file.</h2>
+          <p>GI LINK checks the source, then shows the formats it can retrieve. Nothing downloads until you choose an option.</p>
         </div>
-
-        <div class="p-3.5 bg-slate-900/50 border border-slate-800/70 rounded-lg">
-          <div class="flex items-center space-x-2.5 mb-1.5">
-            <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400" aria-hidden="true"></i>
-            <h3 class="font-bold text-white text-sm">Privacy-First Architecture</h3>
-          </div>
-          <p class="text-slate-400 leading-relaxed">No tracking, no registration required, and downloaded temp files are purged automatically from memory.</p>
-        </div>
-
-        <div class="p-3.5 bg-slate-900/50 border border-slate-800/70 rounded-lg">
-          <div class="flex items-center space-x-2.5 mb-1.5">
-            <i data-lucide="music" class="w-4 h-4 text-pink-400" aria-hidden="true"></i>
-            <h3 class="font-bold text-white text-sm">MP3 Audio Extraction</h3>
-          </div>
-          <p class="text-slate-400 leading-relaxed">Extract crisp audio tracks and background music directly from public video streams.</p>
-        </div>
-
-        <div class="p-3.5 bg-slate-900/50 border border-slate-800/70 rounded-lg">
-          <div class="flex items-center space-x-2.5 mb-1.5">
-            <i data-lucide="smartphone" class="w-4 h-4 text-indigo-400" aria-hidden="true"></i>
-            <h3 class="font-bold text-white text-sm">Installable PWA</h3>
-          </div>
-          <p class="text-slate-400 leading-relaxed">Install GI LINK as a lightweight Progressive Web App on iOS, Android, macOS, and Windows.</p>
-        </div>
+        <ol class="steps-list">
+          <li><span class="step-number">01</span><div><h3>Paste a public link</h3><p>Enter a link to a supported post or media page.</p></div></li>
+          <li><span class="step-number">02</span><div><h3>Review the options</h3><p>Check the available media details and file formats.</p></div></li>
+          <li><span class="step-number">03</span><div><h3>Save what you need</h3><p>Choose a download. The file is sent to your browser.</p></div></li>
+        </ol>
       </div>
     </section>
 
-    <!-- Informational SEO Section 3: Frequently Asked Questions (Accordion) -->
-    <section id="faq" class="mt-10 pt-8 border-t border-slate-800/60">
-      <div class="text-center mb-6">
-        <h2 class="text-lg sm:text-2xl font-bold text-white tracking-tight">Frequently Asked Questions</h2>
-        <p class="text-xs sm:text-sm text-slate-400 mt-1">Everything you need to know about using GI LINK</p>
-      </div>
-
-      <div class="space-y-2.5 max-w-2xl mx-auto text-xs">
-        <details class="bg-slate-900/70 border border-slate-800 rounded-lg p-3 group">
-          <summary class="flex items-center justify-between font-semibold text-white cursor-pointer select-none">
-            <span>Is GI LINK completely free to use?</span>
-            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition group-open:rotate-180" aria-hidden="true"></i>
-          </summary>
-          <p class="text-slate-400 mt-2.5 leading-relaxed">
-            Yes, GI LINK is 100% free with no registration, subscriptions, or hidden charges. You can download personal copies of public media whenever needed.
-          </p>
-        </details>
-
-        <details class="bg-slate-900/70 border border-slate-800 rounded-lg p-3 group">
-          <summary class="flex items-center justify-between font-semibold text-white cursor-pointer select-none">
-            <span>Which websites and social networks are supported?</span>
-            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition group-open:rotate-180" aria-hidden="true"></i>
-          </summary>
-          <p class="text-slate-400 mt-2.5 leading-relaxed">
-            GI LINK supports Instagram Reels, YouTube videos/Shorts, TikTok, Facebook videos, Twitter/X clips, Reddit, Vimeo, SoundCloud, and hundreds of public video hosting sites.
-          </p>
-        </details>
-
-        <details class="bg-slate-900/70 border border-slate-800 rounded-lg p-3 group">
-          <summary class="flex items-center justify-between font-semibold text-white cursor-pointer select-none">
-            <span>Where are downloaded files saved on my device?</span>
-            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition group-open:rotate-180" aria-hidden="true"></i>
-          </summary>
-          <p class="text-slate-400 mt-2.5 leading-relaxed">
-            On Android and PC/Mac, files are saved in your default <code>Downloads</code> folder. On iPhone/iPad, Safari prompts you to save the file into the <strong>Files</strong> app or photo gallery.
-          </p>
-        </details>
-
-        <details class="bg-slate-900/70 border border-slate-800 rounded-lg p-3 group">
-          <summary class="flex items-center justify-between font-semibold text-white cursor-pointer select-none">
-            <span>Does GI LINK store copies of downloaded videos?</span>
-            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition group-open:rotate-180" aria-hidden="true"></i>
-          </summary>
-          <p class="text-slate-400 mt-2.5 leading-relaxed">
-            No. GI LINK operates as a transient bridge. We do not maintain any permanent database of files or user links. Media files temporarily created during streaming are immediately deleted once transmitted to your browser.
-          </p>
-        </details>
-
-        <details class="bg-slate-900/70 border border-slate-800 rounded-lg p-3 group">
-          <summary class="flex items-center justify-between font-semibold text-white cursor-pointer select-none">
-            <span>Can I download private Instagram or Facebook videos?</span>
-            <i data-lucide="chevron-down" class="w-4 h-4 text-slate-400 transition group-open:rotate-180" aria-hidden="true"></i>
-          </summary>
-          <p class="text-slate-400 mt-2.5 leading-relaxed">
-            No. To protect user privacy, GI LINK only supports publicly accessible media links. Content from private accounts cannot be accessed or downloaded.
-          </p>
-        </details>
+    <section class="section faq-section" id="faq">
+      <div class="container faq-grid">
+        <div class="section-heading">
+          <p class="eyebrow">GOOD TO KNOW</p>
+          <h2>Questions,<br>answered.</h2>
+        </div>
+        <div class="faq-list">
+          <details><summary>Which links can I use?<span aria-hidden="true">+</span></summary><p>GI LINK uses yt-dlp to support a broad range of public media pages, including the sources listed above. A particular post may still be unavailable because of its privacy, region, account, or platform restrictions.</p></details>
+          <details><summary>Will every audio download be MP3?<span aria-hidden="true">+</span></summary><p>No. MP3 is offered when the server can convert the source audio. Otherwise, the original audio format is identified before you download.</p></details>
+          <details><summary>Where does the file go?<span aria-hidden="true">+</span></summary><p>Your browser handles the download and uses its normal download location or save prompt.</p></details>
+          <details><summary>Can I download private content?<span aria-hidden="true">+</span></summary><p>No. GI LINK is intended for public content you have permission to download. It does not provide access to private posts.</p></details>
+        </div>
       </div>
     </section>
-
+    <section class="responsible-use">
+      <div class="container responsible-inner">
+        <span class="responsible-icon" aria-hidden="true">↗</span>
+        <p><strong>Use media responsibly.</strong> You are responsible for having permission to download and use the content. Respect copyright and the source platform’s terms.</p>
+        <a href="/terms">Read the terms <span aria-hidden="true">→</span></a>
+      </div>
+    </section>
+    <dialog class="history-dialog" id="historyModal" aria-labelledby="historyTitle">
+      <button class="history-backdrop" type="button" data-history-close aria-label="Close recent links"></button>
+      <section class="history-sheet">
+        <div class="history-heading"><div><p class="eyebrow">ON THIS DEVICE</p><h2 id="historyTitle">Recent links</h2></div><button id="closeHistoryBtn" class="icon-button" type="button" aria-label="Close history">×</button></div>
+        <div id="historyList" class="history-list"></div>
+        <div class="history-actions"><p>History stays in this browser.</p><button id="clearHistoryBtn" class="text-button" type="button">Clear history</button></div>
+      </section>
+    </dialog>
   </main>
-
-  <!-- History Drawer Modal -->
-  <div id="historyModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden flex justify-end" aria-modal="true" role="dialog" aria-labelledby="historyTitle">
-    <div class="w-full max-w-sm bg-slate-900 border-l border-slate-800 h-full p-4 overflow-y-auto flex flex-col justify-between">
-      <div>
-        <div class="flex items-center justify-between pb-3 border-b border-slate-800">
-          <div class="flex items-center space-x-2">
-            <i data-lucide="history" class="w-4 h-4 text-indigo-400" aria-hidden="true"></i>
-            <h2 id="historyTitle" class="font-bold text-white text-base">Download History</h2>
-          </div>
-          <button id="closeHistoryBtn" class="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-white" aria-label="Close history modal">
-            <i data-lucide="x" class="w-4 h-4" aria-hidden="true"></i>
-          </button>
-        </div>
-        <div id="historyList" class="mt-3 space-y-2 text-xs">
-          <!-- History items dynamically inserted -->
-        </div>
-      </div>
-      <div class="pt-3 border-t border-slate-800">
-        <button id="clearHistoryBtn" class="w-full py-1.5 text-xs font-semibold text-red-400 hover:bg-red-500/10 rounded transition border border-red-500/20" aria-label="Clear all download history">
-          Clear History
-        </button>
-      </div>
-    </div>
-  </div>
 """
 
 
-# ==============================================================================
-# SUBPAGE CONTENTS: ABOUT, PRIVACY, TERMS, DMCA, CONTACT
-# ==============================================================================
+def _information_page(title: str, eyebrow: str, intro: str, sections: str) -> str:
+    return f"""
+  <main class="content-page" id="main">
+    <div class="container content-container">
+      <a class="back-link" href="/">← <span>Back to GI LINK</span></a>
+      <header class="content-heading"><p class="eyebrow">{eyebrow}</p><h1>{title}</h1><p>{intro}</p></header>
+      <div class="prose-content">{sections}</div>
+    </div>
+  </main>
+"""
+
 
 def get_about_html() -> str:
-    return """
-  <main class="flex-1 max-w-3xl mx-auto px-4 py-8 w-full">
-    <div class="mb-6">
-      <a href="/" class="text-xs text-indigo-400 hover:underline inline-flex items-center space-x-1 mb-2">
-        <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
-        <span>Back to Downloader</span>
-      </a>
-      <h1 class="text-2xl sm:text-3xl font-extrabold text-white">About GI LINK</h1>
-      <p class="text-xs sm:text-sm text-slate-400 mt-1">High-performance universal media extraction built for the modern web.</p>
-    </div>
+    return _information_page(
+        "A simpler way to save public media.",
+        "ABOUT GI LINK",
+        "GI LINK is a web interface for retrieving media from public links. It combines a FastAPI service with yt-dlp and lets you choose from the formats available for a source.",
+        """
+      <section><h2>How it works</h2><p>When you submit a link, GI LINK asks its media extractor for details and available formats. When you select a download, the server retrieves the selected media and streams it to your browser. Temporary files created for a download are removed after the response is sent.</p></section>
+      <section><h2>Built with</h2><ul><li>FastAPI for the web application and API.</li><li>yt-dlp for media information and downloads.</li><li>Vercel for the current deployment.</li></ul></section>
+      <section><h2>Responsible use</h2><p>Use GI LINK only for public content you own or are authorized to download. Respect copyright and each source platform’s terms. GI LINK does not unlock private posts.</p></section>
+      <section><h2>Project</h2><p>GI LINK is maintained by Ghalib Kamal. The source code is available on <a href="https://github.com/ghalibkamal7/gilink" target="_blank" rel="noopener noreferrer">GitHub</a>.</p></section>
+""",
+    )
 
-    <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 space-y-4 text-xs sm:text-sm text-slate-300 leading-relaxed">
-      <div>
-        <h2 class="text-base font-bold text-white mb-1.5 flex items-center space-x-2">
-          <i data-lucide="sparkles" class="w-4 h-4 text-indigo-400"></i>
-          <span>Our Mission</span>
-        </h2>
-        <p>
-          GI LINK was created to provide a clean, distraction-free, and reliable media downloader for content creators, researchers, and everyday web users. In a web cluttered with pop-up advertisements, malicious redirects, and broken tools, GI LINK stands out with an ultra-fast, privacy-first interface.
-        </p>
-      </div>
-
-      <div class="pt-3 border-t border-slate-800/80">
-        <h2 class="text-base font-bold text-white mb-1.5 flex items-center space-x-2">
-          <i data-lucide="code-2" class="w-4 h-4 text-purple-400"></i>
-          <span>Technology &amp; Architecture</span>
-        </h2>
-        <p class="mb-2">
-          GI LINK is engineered using industry-proven open-source technologies:
-        </p>
-        <ul class="list-disc list-inside space-y-1 text-slate-400 pl-1">
-          <li><strong>Backend:</strong> Python 3 with FastAPI for high-concurrency async request processing.</li>
-          <li><strong>Extraction Engine:</strong> Powered by the robust yt-dlp suite with cloud resilience.</li>
-          <li><strong>Deployment:</strong> Global serverless edge infrastructure via Vercel.</li>
-          <li><strong>Client Experience:</strong> Pure vanilla JavaScript with Tailwind CSS and Progressive Web App (PWA) offline capabilities.</li>
-        </ul>
-      </div>
-
-      <div class="pt-3 border-t border-slate-800/80">
-        <h2 class="text-base font-bold text-white mb-1.5 flex items-center space-x-2">
-          <i data-lucide="user-check" class="w-4 h-4 text-emerald-400"></i>
-          <span>The Creator</span>
-        </h2>
-        <p>
-          GI LINK is designed, developed, and maintained by <strong>Ghalib Kamal</strong>. Continuous enhancements are made to support changing social media API endpoints, optimize delivery speeds, and ensure mobile responsiveness.
-        </p>
-      </div>
-
-      <div class="pt-3 border-t border-slate-800/80">
-        <h2 class="text-base font-bold text-white mb-1.5 flex items-center space-x-2">
-          <i data-lucide="shield-alert" class="w-4 h-4 text-amber-400"></i>
-          <span>Commitment to Fair Use</span>
-        </h2>
-        <p>
-          GI LINK is an educational tool. We believe in fair use, archiving personal creations, and facilitating offline viewing for personal study. We strictly respect intellectual property rights and encourage all users to download content only when authorized by copyright holders.
-        </p>
-      </div>
-    </div>
-  </main>
-"""
 
 def get_privacy_html() -> str:
-    return """
-  <main class="flex-1 max-w-3xl mx-auto px-4 py-8 w-full">
-    <div class="mb-6">
-      <a href="/" class="text-xs text-indigo-400 hover:underline inline-flex items-center space-x-1 mb-2">
-        <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
-        <span>Back to Downloader</span>
-      </a>
-      <h1 class="text-2xl sm:text-3xl font-extrabold text-white">Privacy Policy</h1>
-      <p class="text-xs sm:text-sm text-slate-400 mt-1">Last Updated: October 2026 &bull; Strict Zero-Logging Standards</p>
-    </div>
+    return _information_page(
+        "Privacy policy",
+        "YOUR PRIVACY",
+        "This page describes the information GI LINK handles when you use the website.",
+        """
+      <section><h2>Links and downloads</h2><p>When you submit a URL, the service processes it to retrieve media information or a download. The URL and the media request are sent to the source platform and to the hosting provider as needed to fulfill the request. GI LINK does not maintain a user account or a persistent download library.</p></section>
+      <section><h2>Temporary files</h2><p>Some downloads are temporarily written to server storage before they are streamed to your browser. The application removes those files after the response completes. Temporary storage may be affected by interrupted requests or hosting-provider lifecycle behavior.</p></section>
+      <section><h2>Browser history</h2><p>Recent links, when shown, are kept in the current page’s memory only. They are not saved to a GI LINK account and are cleared when the page is closed or refreshed.</p></section>
+      <section><h2>Hosting and third parties</h2><p>The hosting provider may process standard operational data, such as request information, to deliver and secure the service. Source platforms and your browser may also apply their own privacy policies and settings.</p></section>
+      <section><h2>Questions</h2><p>For privacy questions, use the project’s <a href="https://github.com/ghalibkamal7/gilink/issues" target="_blank" rel="noopener noreferrer">GitHub issue tracker</a>.</p></section>
+""",
+    )
 
-    <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 space-y-4 text-xs sm:text-sm text-slate-300 leading-relaxed">
-      <div>
-        <h2 class="text-base font-bold text-white mb-1">1. Overview</h2>
-        <p>
-          At <strong>GI LINK</strong>, accessible from <code>https://gilinkdl.vercel.app</code>, the privacy of our visitors is of paramount importance. This Privacy Policy document details the types of information handled by GI LINK and our zero-retention principles.
-        </p>
-      </div>
-
-      <div class="pt-3 border-t border-slate-800/80">
-        <h2 class="text-base font-bold text-white mb-1">2. Information We Do NOT Collect</h2>
-        <p>Unlike many online services, GI LINK does NOT:</p>
-        <ul class="list-disc list-inside space-y-1 text-slate-400 pl-1 mt-1">
-          <li>Require user registration, email, or telephone numbers.</li>
-          <li>Store, archive, or catalogue URLs submitted for download.</li>
-          <li>Retain permanent copies of media files processed through the engine.</li>
-          <li>Sell, lease, or distribute visitor browsing patterns to data brokers.</li>
-        </ul>
-      </div>
-
-      <div class="pt-3 border-t border-slate-800/80">
-        <h2 class="text-base font-bold text-white mb-1">3. Ephemeral Processing &amp; File Deletion</h2>
-        <p>
-          When you request a download, our serverless backend temporarily streams the requested data from the source platform to format the file for your browser. Once the download stream concludes, the temporary server file is immediately purged from system memory (using automated background removal tasks).
-        </p>
-      </div>
-
-      <div class="pt-3 border-t border-slate-800/80">
-        <h2 class="text-base font-bold text-white mb-1">4. Client-Side Browser Storage (History)</h2>
-        <p>
-          The download history displayed inside the GI LINK app is maintained exclusively in your device's browser memory (HTML5 Local/DOM storage). It is never synchronized to any remote database and can be cleared instantly via the "Clear History" button.
-        </p>
-      </div>
-
-      <div class="pt-3 border-t border-slate-800/80">
-        <h2 class="text-base font-bold text-white mb-1">5. Log Files and Web Hosting</h2>
-        <p>
-          GI LINK utilizes standard hosting telemetry provided by Vercel for infrastructure health monitoring. These standard logs (IP addresses, browser type, referring pages, date/time stamps) are not linked to personally identifiable information.
-        </p>
-      </div>
-
-      <div class="pt-3 border-t border-slate-800/80">
-        <h2 class="text-base font-bold text-white mb-1">6. Advertising &amp; Third-Party Cookies</h2>
-        <p>
-          Third-party advertising partners (such as Google AdSense) may deploy cookies and web beacons on our site to serve relevant ads based on prior visits to this or other websites. Visitors can choose to disable cookies through their individual browser options or via <a href="https://adssettings.google.com" target="_blank" rel="noopener noreferrer" class="text-indigo-400 hover:underline">Google Ads Settings</a>.
-        </p>
-      </div>
-
-      <div class="pt-3 border-t border-slate-800/80">
-        <h2 class="text-base font-bold text-white mb-1">7. Contact Information</h2>
-        <p>
-          For privacy inquiries or clarifications regarding our handling practices, please contact us at our <a href="/contact" class="text-indigo-400 hover:underline">Contact Page</a>.
-        </p>
-      </div>
-    </div>
-  </main>
-"""
 
 def get_terms_html() -> str:
-    return """
-  <main class="flex-1 max-w-3xl mx-auto px-4 py-8 w-full">
-    <div class="mb-6">
-      <a href="/" class="text-xs text-indigo-400 hover:underline inline-flex items-center space-x-1 mb-2">
-        <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
-        <span>Back to Downloader</span>
-      </a>
-      <h1 class="text-2xl sm:text-3xl font-extrabold text-white">Terms of Service</h1>
-      <p class="text-xs sm:text-sm text-slate-400 mt-1">Effective Date: October 2026 &bull; User Agreement</p>
-    </div>
+    return _information_page(
+        "Terms of service",
+        "USING GI LINK",
+        "By using GI LINK, you agree to use the service lawfully and responsibly.",
+        """
+      <section><h2>Permitted use</h2><p>Use the service only with public media and only when you own the content or have permission to download it. You are responsible for complying with applicable laws, copyright, and the source platform’s terms.</p></section>
+      <section><h2>Access restrictions</h2><p>GI LINK does not provide access to private content or bypass account, payment, or other access controls. Do not use the service to interfere with platforms or infringe another person’s rights.</p></section>
+      <section><h2>Availability</h2><p>Media extraction depends on third-party websites and software that can change without notice. GI LINK may be unavailable or unable to retrieve a particular link. The service is provided without a guarantee of uninterrupted availability.</p></section>
+      <section><h2>Third-party content</h2><p>Media remains hosted by its source platform. GI LINK does not claim ownership of third-party content. You are responsible for how you use any file you download.</p></section>
+      <section><h2>Changes</h2><p>These terms may be updated as the service changes. Continued use after an update means you accept the revised terms.</p></section>
+""",
+    )
 
-    <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 space-y-4 text-xs sm:text-sm text-slate-300 leading-relaxed">
-      <div>
-        <h2 class="text-base font-bold text-white mb-1">1. Acceptance of Terms</h2>
-        <p>
-          By accessing and using GI LINK, you acknowledge and agree to comply with these Terms of Service. If you do not agree with any portion of these terms, you must discontinue use immediately.
-        </p>
-      </div>
-
-      <div class="pt-3 border-t border-slate-800/80">
-        <h2 class="text-base font-bold text-white mb-1">2. Permitted &amp; Lawful Use</h2>
-        <p>
-          GI LINK is provided solely for personal, non-commercial, educational, and fair-use archiving purposes. Users are strictly responsible for:
-        </p>
-        <ul class="list-disc list-inside space-y-1 text-slate-400 pl-1 mt-1">
-          <li>Ensuring you own the media or possess written authorization from the copyright holder.</li>
-          <li>Complying with copyright legislation applicable in your jurisdiction.</li>
-          <li>Refraining from downloading commercial copyrighted movies, broadcast music, or protected works without explicit licenses.</li>
-        </ul>
-      </div>
-
-      <div class="pt-3 border-t border-slate-800/80">
-        <h2 class="text-base font-bold text-white mb-1">3. Non-Hosting &amp; Technical Intermediary Disclosure</h2>
-        <p>
-          GI LINK functions strictly as a client-side proxy tool utilizing open-source format extraction libraries. We do not host, broadcast, archive, or duplicate media files on our infrastructure. All video content resides on third-party servers outside of our control.
-        </p>
-      </div>
-
-      <div class="pt-3 border-t border-slate-800/80">
-        <h2 class="text-base font-bold text-white mb-1">4. Disclaimer of Warranties</h2>
-        <p>
-          The service is provided on an "AS IS" and "AS AVAILABLE" basis without warranties of any kind. GI LINK does not guarantee continuous uptime, error-free operation, or uninterrupted compatibility with third-party social media platforms.
-        </p>
-      </div>
-
-      <div class="pt-3 border-t border-slate-800/80">
-        <h2 class="text-base font-bold text-white mb-1">5. Limitation of Liability</h2>
-        <p>
-          In no event shall GI LINK, its developer Ghalib Kamal, or its hosting providers be liable for damages resulting from user misuse, unauthorized media duplication, or violation of third-party platform terms.
-        </p>
-      </div>
-    </div>
-  </main>
-"""
 
 def get_dmca_html() -> str:
-    return """
-  <main class="flex-1 max-w-3xl mx-auto px-4 py-8 w-full">
-    <div class="mb-6">
-      <a href="/" class="text-xs text-indigo-400 hover:underline inline-flex items-center space-x-1 mb-2">
-        <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
-        <span>Back to Downloader</span>
-      </a>
-      <h1 class="text-2xl sm:text-3xl font-extrabold text-white">DMCA &amp; Copyright Policy</h1>
-      <p class="text-xs sm:text-sm text-slate-400 mt-1">Digital Millennium Copyright Act Notice &amp; Takedown Procedure</p>
-    </div>
+    return _information_page(
+        "Copyright & takedown requests",
+        "RESPECTING COPYRIGHT",
+        "GI LINK is a tool for processing links submitted by users. It does not operate a catalog of media or host a public media library.",
+        """
+      <section><h2>Report a concern</h2><p>If you believe a link is being used to infringe your rights, submit a report through the <a href="https://github.com/ghalibkamal7/gilink/issues" target="_blank" rel="noopener noreferrer">GI LINK GitHub issue tracker</a>. Include the relevant source URL, identify the work, explain your relationship to the rights holder, and provide contact details so the report can be reviewed.</p></section>
+      <section><h2>What GI LINK can do</h2><p>Media is retrieved from the third-party source supplied in a request. GI LINK does not control that source or remove its content. A request to block a link can be reviewed for changes to GI LINK’s processing behavior.</p></section>
+      <section><h2>Responsible use</h2><p>Do not download or use copyrighted material unless you have the right to do so. Respect applicable copyright laws and the terms of the source platform.</p></section>
+""",
+    )
 
-    <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 space-y-4 text-xs sm:text-sm text-slate-300 leading-relaxed">
-      <div>
-        <h2 class="text-base font-bold text-white mb-1">1. Respect for Intellectual Property</h2>
-        <p>
-          GI LINK respects the intellectual property rights of content creators, artists, and rights holders. We comply fully with the Digital Millennium Copyright Act (17 U.S.C. &sect; 512) and international copyright directives.
-        </p>
-      </div>
-
-      <div class="pt-3 border-t border-slate-800/80">
-        <h2 class="text-base font-bold text-white mb-1">2. Non-Hosting Safe Harbor Statement</h2>
-        <p>
-          <strong>GI LINK DOES NOT HOST ANY FILES OR VIDEOS.</strong><br/>
-          All media processed through GI LINK is retrieved directly from the public third-party URL supplied by the user. Our servers never keep, catalog, or index downloaded media. Because no files are stored on our servers, removing content from GI LINK does not remove it from the hosting platform (e.g., YouTube, Instagram, or TikTok).
-        </p>
-      </div>
-
-      <div class="pt-3 border-t border-slate-800/80">
-        <h2 class="text-base font-bold text-white mb-1">3. Domain / Link Blocking Requests</h2>
-        <p>
-          If you are a copyright owner or authorized representative and wish to request the blocking of specific domains or URL patterns from being processed through the GI LINK extractor, please submit a notice containing:
-        </p>
-        <ul class="list-disc list-inside space-y-1 text-slate-400 pl-1 mt-1">
-          <li>Identification of the copyrighted work claimed to have been infringed.</li>
-          <li>Exact URLs of the material you wish to block from our proxy pipeline.</li>
-          <li>Your contact information including name, organization, email, and phone number.</li>
-          <li>A statement made under penalty of perjury that you are authorized to act on behalf of the owner.</li>
-        </ul>
-      </div>
-
-      <div class="pt-3 border-t border-slate-800/80">
-        <h2 class="text-base font-bold text-white mb-1">4. Designated Contact</h2>
-        <p>
-          Copyright notices and takedown inquiries should be directed to our designated administrator via our <a href="/contact" class="text-indigo-400 hover:underline">Contact Page</a>. We review and process verified requests promptly.
-        </p>
-      </div>
-    </div>
-  </main>
-"""
 
 def get_contact_html() -> str:
-    return """
-  <main class="flex-1 max-w-3xl mx-auto px-4 py-8 w-full">
-    <div class="mb-6">
-      <a href="/" class="text-xs text-indigo-400 hover:underline inline-flex items-center space-x-1 mb-2">
-        <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
-        <span>Back to Downloader</span>
-      </a>
-      <h1 class="text-2xl sm:text-3xl font-extrabold text-white">Contact GI LINK</h1>
-      <p class="text-xs sm:text-sm text-slate-400 mt-1">Feedback, bug reports, feature requests, and partnership inquiries</p>
-    </div>
-
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 space-y-3 text-xs sm:text-sm text-slate-300">
-        <h2 class="text-base font-bold text-white mb-1 flex items-center space-x-2">
-          <i data-lucide="mail" class="w-4 h-4 text-indigo-400"></i>
-          <span>Direct Inquiries</span>
-        </h2>
-        <p class="text-slate-400 leading-relaxed">
-          Have questions, technical suggestions, or identified an extractor issue with a specific platform? Reach out directly to the maintainer.
-        </p>
-        <div class="pt-2 space-y-2 text-xs">
-          <div class="flex items-center space-x-2">
-            <span class="text-slate-500 font-medium w-16">Developer:</span>
-            <span class="text-white font-semibold">Ghalib Kamal</span>
-          </div>
-          <div class="flex items-center space-x-2">
-            <span class="text-slate-500 font-medium w-16">GitHub:</span>
-            <a href="https://github.com/ghalibkamal7/gilink" target="_blank" rel="noopener noreferrer" class="text-indigo-400 hover:underline">ghalibkamal7/gilink</a>
-          </div>
-          <div class="flex items-center space-x-2">
-            <span class="text-slate-500 font-medium w-16">Project:</span>
-            <span class="text-slate-300">GI LINK Media Downloader</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-5 space-y-3 text-xs sm:text-sm text-slate-300">
-        <h2 class="text-base font-bold text-white mb-1 flex items-center space-x-2">
-          <i data-lucide="message-square" class="w-4 h-4 text-purple-400"></i>
-          <span>Send Feedback</span>
-        </h2>
-        <form class="space-y-2.5" onsubmit="event.preventDefault(); alert('Thank you for reaching out! We will review your message.'); this.reset();">
-          <div>
-            <label class="block text-[11px] font-semibold text-slate-400 mb-1" for="contactName">Your Name</label>
-            <input id="contactName" type="text" required placeholder="Ghalib..." class="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3 py-2 text-slate-100 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none" />
-          </div>
-          <div>
-            <label class="block text-[11px] font-semibold text-slate-400 mb-1" for="contactEmail">Your Email</label>
-            <input id="contactEmail" type="email" required placeholder="name@example.com" class="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3 py-2 text-slate-100 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none" />
-          </div>
-          <div>
-            <label class="block text-[11px] font-semibold text-slate-400 mb-1" for="contactMessage">Message / Report</label>
-            <textarea id="contactMessage" rows="3" required placeholder="Describe your issue or suggestion..." class="w-full bg-slate-950 border border-slate-700/80 rounded-lg px-3 py-2 text-slate-100 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none"></textarea>
-          </div>
-          <button type="submit" class="w-full py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs rounded-lg shadow transition">
-            Submit Message
-          </button>
-        </form>
-      </div>
-    </div>
-  </main>
-"""
+    return _information_page(
+        "Get in touch",
+        "CONTACT",
+        "The most reliable way to report a bug, suggest an improvement, or ask about the project is through GitHub.",
+        """
+      <section class="contact-card"><h2>GI LINK on GitHub</h2><p>Share a reproducible bug report or feature suggestion. Please avoid posting private links, personal information, or secrets in a public issue.</p><a class="button button-primary" href="https://github.com/ghalibkamal7/gilink/issues" target="_blank" rel="noopener noreferrer">Open the issue tracker <span aria-hidden="true">↗</span></a></section>
+""",
+    )
 
 
-# ==============================================================================
-# JAVASCRIPT LOGIC FOR HOMEPAGE
-# ==============================================================================
-
-HOME_SCRIPTS = r"""
-  <script>
-  document.addEventListener('DOMContentLoaded', () => {
-    const urlForm = document.getElementById('urlForm');
-    const urlInput = document.getElementById('urlInput');
-    const fetchBtn = document.getElementById('fetchBtn');
-    const fetchIcon = document.getElementById('fetchIcon');
-    const fetchText = document.getElementById('fetchText');
-    const fetchSpinner = document.getElementById('fetchSpinner');
-    const mediaCard = document.getElementById('mediaCard');
-    const errorCard = document.getElementById('errorCard');
-    const errorMessage = document.getElementById('errorMessage');
-    const mediaThumb = document.getElementById('mediaThumb');
-    const mediaTitle = document.getElementById('mediaTitle');
-    const mediaAuthor = document.getElementById('authorText');
-    const mediaDuration = document.getElementById('mediaDuration');
-    const mediaPlatform = document.getElementById('mediaPlatform');
-    const formatPresets = document.getElementById('formatPresets');
-    const downloadStatus = document.getElementById('downloadStatus');
-    const statusText = document.getElementById('statusText');
-    const statusPercent = document.getElementById('statusPercent');
-    const statusBar = document.getElementById('statusBar');
-    const statusBytes = document.getElementById('statusBytes');
-    const statusRemaining = document.getElementById('statusRemaining');
-    const historyBtn = document.getElementById('historyBtn');
-    const historyModal = document.getElementById('historyModal');
-    const closeHistoryBtn = document.getElementById('closeHistoryBtn');
-    const clearHistoryBtn = document.getElementById('clearHistoryBtn');
-    const historyList = document.getElementById('historyList');
-    const pasteBtn = document.getElementById('pasteBtn');
-    const clearBtn = document.getElementById('clearBtn');
-
-    const setStatus = (iconName, iconClasses, message, messageClasses = '') => {
-      const icon = document.createElement('i');
-      icon.dataset.lucide = iconName;
-      icon.className = iconClasses;
-      const text = document.createElement('span');
-      text.className = messageClasses;
-      text.textContent = message;
-      statusText.replaceChildren(icon, text);
-      if (typeof lucide !== 'undefined') lucide.createIcons();
-    };
-
-    const updateHistory = (item) => {
-      const div = document.createElement('div');
-      div.className = 'p-2 rounded bg-slate-800/50 border border-slate-700/60';
-      const link = document.createElement('a');
-      link.href = '#';
-      link.className = 'text-indigo-300 hover:underline line-clamp-1';
-      link.textContent = item.title;
-      const platform = document.createElement('span');
-      platform.className = 'text-slate-500 text-[10px]';
-      platform.textContent = item.platform;
-      div.append(link, platform);
-      historyList.prepend(div);
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        urlInput.value = item.url;
-        fetchMedia();
-        historyModal.classList.add('hidden');
-      });
-    };
-
-    const fetchMedia = async () => {
-      const url = urlInput.value.trim();
-      if (!url) return;
-      fetchSpinner.classList.remove('hidden');
-      fetchIcon.classList.add('hidden');
-      fetchBtn.disabled = true;
-      errorCard.classList.add('hidden');
-      mediaCard.classList.add('hidden');
-      downloadStatus.classList.add('hidden');
-
-      try {
-        const resp = await fetch('/api/info', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url })
-        });
-        const data = await resp.json();
-        if (!data.success) throw new Error(data.error || 'Failed to retrieve media details.');
-        const info = data.data;
-        try {
-          const thumbnailUrl = new URL(info.thumbnail, window.location.origin);
-          mediaThumb.src = ['http:', 'https:'].includes(thumbnailUrl.protocol) ? thumbnailUrl.href : '';
-        } catch {
-          mediaThumb.removeAttribute('src');
-        }
-        mediaTitle.textContent = info.title;
-        mediaAuthor.textContent = info.uploader;
-        mediaDuration.textContent = info.duration || '';
-        mediaPlatform.textContent = info.platform;
-        formatPresets.replaceChildren();
-
-        info.presets.forEach(p => {
-          const btn = document.createElement('button');
-          btn.className = 'w-full px-3 py-2 text-xs rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 border border-slate-700 transition flex items-center justify-between font-medium active:scale-98';
-          const name = document.createElement('span');
-          name.textContent = p.name;
-          const badge = document.createElement('span');
-          badge.className = 'text-[10px] text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20';
-          badge.textContent = p.badge || p.ext;
-          btn.append(name, badge);
-          btn.addEventListener('click', () => startDownload(url, p.id, p.is_audio === true || p.ext === 'mp3'));
-          formatPresets.appendChild(btn);
-        });
-
-        mediaCard.classList.remove('hidden');
-        updateHistory({ url, title: info.title, platform: info.platform });
-      } catch (e) {
-        errorMessage.textContent = e.message;
-        errorCard.classList.remove('hidden');
-      } finally {
-        fetchSpinner.classList.add('hidden');
-        fetchIcon.classList.remove('hidden');
-        fetchBtn.disabled = false;
-        if (typeof lucide !== 'undefined') lucide.createIcons();
-      }
-    };
-
-    const startDownload = async (url, formatSpec, isAudio) => {
-      downloadStatus.classList.remove('hidden');
-      if (statusPercent) statusPercent.textContent = '0%';
-      if (statusBar) {
-        statusBar.style.width = '0%';
-        statusBar.className = 'h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-150';
-      }
-      if (statusBytes) statusBytes.textContent = '0.0 MB / ...';
-      if (statusRemaining) statusRemaining.textContent = 'Connecting...';
-      setStatus('loader-2', 'w-3.5 h-3.5 animate-spin', 'Requesting media stream...');
-
-      const dlUrl = `/api/download?url=${encodeURIComponent(url)}&format_spec=${encodeURIComponent(formatSpec)}&is_audio=${isAudio}`;
-
-      try {
-        const res = await fetch(dlUrl);
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.detail || 'Download request failed (' + res.status + ')');
-        }
-
-        const clHeader = res.headers.get('content-length');
-        const totalBytes = clHeader ? parseInt(clHeader, 10) : 0;
-
-        const mediaType = (res.headers.get('content-type') || 'application/octet-stream').split(';', 1)[0].trim();
-        const extensions = {
-          'audio/aac': 'aac',
-          'audio/mp4': 'm4a',
-          'audio/mpeg': 'mp3',
-          'audio/ogg': 'ogg',
-          'audio/opus': 'opus',
-          'audio/wav': 'wav',
-          'audio/webm': 'webm',
-          'video/mp4': 'mp4',
-          'video/webm': 'webm'
-        };
-        let filename = `${isAudio ? 'audio' : 'media'}_download.${extensions[mediaType] || 'bin'}`;
-        const disposition = res.headers.get('content-disposition');
-        if (disposition) {
-          const rfc5987 = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
-          if (rfc5987 && rfc5987[1]) {
-            filename = decodeURIComponent(rfc5987[1]);
-          } else {
-            const standard = /filename="?([^";]+)"?/i.exec(disposition);
-            if (standard && standard[1]) {
-              filename = standard[1];
-            }
-          }
-        }
-
-        setStatus('loader-2', 'w-3.5 h-3.5 animate-spin', 'Downloading media file...');
-
-        const reader = res.body.getReader();
-        const chunks = [];
-        let receivedBytes = 0;
-        const formatMB = (b) => (b / (1024 * 1024)).toFixed(1);
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          chunks.push(value);
-          receivedBytes += value.length;
-
-          const recMB = formatMB(receivedBytes);
-          if (totalBytes > 0) {
-            const pct = Math.min(100, Math.round((receivedBytes / totalBytes) * 100));
-            const totMB = formatMB(totalBytes);
-            const remMB = formatMB(Math.max(0, totalBytes - receivedBytes));
-
-            if (statusPercent) statusPercent.textContent = `${pct}%`;
-            if (statusBar) statusBar.style.width = `${pct}%`;
-            if (statusBytes) statusBytes.textContent = `${recMB} MB / ${totMB} MB`;
-            if (statusRemaining) statusRemaining.textContent = `${remMB} MB remaining`;
-          } else {
-            if (statusPercent) statusPercent.textContent = `${recMB} MB`;
-            if (statusBar) {
-              statusBar.style.width = '65%';
-              if (!statusBar.classList.contains('animate-pulse')) statusBar.classList.add('animate-pulse');
-            }
-            if (statusBytes) statusBytes.textContent = `${recMB} MB downloaded`;
-            if (statusRemaining) statusRemaining.textContent = 'Streaming...';
-          }
-        }
-
-        const blob = new Blob(chunks, { type: mediaType });
-        const blobUrl = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.style.display = 'none';
-        a.href = blobUrl;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        let fallbackRevokeTimer;
-        let focusRevokeTimer;
-        const revokeBlobUrl = () => {
-          clearTimeout(fallbackRevokeTimer);
-          clearTimeout(focusRevokeTimer);
-          window.removeEventListener('focus', handleDownloadFocus);
-          window.URL.revokeObjectURL(blobUrl);
-        };
-        const handleDownloadFocus = () => {
-          focusRevokeTimer = setTimeout(revokeBlobUrl, 5000);
-        };
-        window.addEventListener('focus', handleDownloadFocus, { once: true });
-        fallbackRevokeTimer = setTimeout(revokeBlobUrl, 60000);
-
-        if (statusPercent) statusPercent.textContent = '100%';
-        if (statusBar) {
-          statusBar.style.width = '100%';
-          statusBar.classList.remove('animate-pulse');
-        }
-        if (statusRemaining) statusRemaining.textContent = 'Saved to device';
-        setStatus('check-circle', 'w-3.5 h-3.5 text-emerald-400', 'Download complete!', 'text-emerald-400 font-semibold');
-        setTimeout(() => downloadStatus.classList.add('hidden'), 4500);
-      } catch (err) {
-        if (statusPercent) statusPercent.textContent = 'Error';
-        if (statusBar) {
-          statusBar.style.width = '100%';
-          statusBar.classList.remove('animate-pulse');
-          statusBar.className = 'h-full bg-red-500 rounded-full';
-        }
-        if (statusRemaining) statusRemaining.textContent = '';
-        setStatus('alert-triangle', 'w-3.5 h-3.5 text-red-400', String(err.message || 'Download failed.'), 'text-red-400 font-semibold');
-      }
-    };
-
-    if (urlForm) urlForm.addEventListener('submit', (e) => { e.preventDefault(); fetchMedia(); });
-
-    if (pasteBtn) {
-      pasteBtn.addEventListener('click', async () => {
-        try {
-          const text = await navigator.clipboard.readText();
-          if (text) {
-            urlInput.value = text;
-            if (clearBtn) clearBtn.style.display = 'block';
-          }
-        } catch (_) {}
-      });
-    }
-
-    if (urlInput) {
-      urlInput.addEventListener('input', () => {
-        if (clearBtn) clearBtn.style.display = urlInput.value ? 'block' : 'none';
-      });
-    }
-
-    if (clearBtn) {
-      clearBtn.addEventListener('click', () => {
-        urlInput.value = '';
-        clearBtn.style.display = 'none';
-      });
-    }
-
-    if (historyBtn && historyModal) historyBtn.addEventListener('click', () => historyModal.classList.remove('hidden'));
-    if (closeHistoryBtn && historyModal) closeHistoryBtn.addEventListener('click', () => historyModal.classList.add('hidden'));
-    if (clearHistoryBtn && historyList) clearHistoryBtn.addEventListener('click', () => { historyList.replaceChildren(); });
-
-    if (typeof lucide !== 'undefined') lucide.createIcons();
-  });
-
-  // --- PWA Service Worker & Install Prompt ---
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
-  }
-
-  let deferredPrompt = null;
-  const installBtn = document.getElementById('installBtn');
-
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    if (installBtn) {
-      installBtn.classList.remove('hidden');
-      installBtn.classList.add('flex');
-    }
-  });
-
-  if (installBtn) {
-    installBtn.addEventListener('click', async () => {
-      if (!deferredPrompt) return;
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      deferredPrompt = null;
-      installBtn.classList.add('hidden');
-      installBtn.classList.remove('flex');
-    });
-  }
-
-  window.addEventListener('appinstalled', () => {
-    deferredPrompt = null;
-    if (installBtn) {
-      installBtn.classList.add('hidden');
-      installBtn.classList.remove('flex');
-    }
-  });
-  </script>
-"""
-
-SUBPAGE_SCRIPTS = """
-  <script>
-  document.addEventListener('DOMContentLoaded', () => {
-    if (typeof lucide !== 'undefined') lucide.createIcons();
-  });
-  </script>
-"""
+HOME_SCRIPTS = '<script src="/static/app.js" defer></script>'
+SUBPAGE_SCRIPTS = '<script src="/static/app.js" defer></script>'

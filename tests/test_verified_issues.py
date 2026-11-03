@@ -13,7 +13,7 @@ from app.downloader import (
     extension_from_mime_type,
     media_type_for_file,
 )
-from app.pages import HOME_SCRIPTS
+from app.pages import HOME_SCRIPTS, get_home_html
 from app.icons import get_favicon_bytes
 
 
@@ -127,10 +127,17 @@ class TestVerifiedIssues(unittest.TestCase):
         for script in scripts:
             self.assertNotIn("innerHTML", script)
 
-        click_offset = HOME_SCRIPTS.index("a.click();")
-        revoke_offset = HOME_SCRIPTS.index("window.URL.revokeObjectURL(blobUrl)")
+        app_script = Path("app/static/app.js").read_text(encoding="utf-8")
+        click_offset = app_script.index("anchor.click();")
+        revoke_offset = app_script.index("URL.revokeObjectURL(blobUrl)")
         self.assertGreater(revoke_offset, click_offset)
-        self.assertIn("setTimeout(revokeBlobUrl, 60000)", HOME_SCRIPTS)
+        self.assertIn("setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000)", app_script)
+
+    def test_history_dialog_is_hidden_until_opened(self):
+        home_html = get_home_html()
+        stylesheet = Path("app/static/style.css").read_text(encoding="utf-8")
+        self.assertIn('<dialog class="history-dialog" id="historyModal"', home_html)
+        self.assertIn(".history-dialog:not([open]) { display: none; }", stylesheet)
 
 
 if __name__ == "__main__":

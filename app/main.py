@@ -6,9 +6,10 @@ import urllib.parse
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException, Query
-from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse, Response
 from starlette.background import BackgroundTask
-from pydantic import BaseModel
+from starlette.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
 try:
     from .downloader import get_media_info, download_media, get_youtube_direct_stream, detect_platform, media_type_for_file
@@ -46,6 +47,7 @@ except ImportError:
     )
 
 app = FastAPI(title="GI LINK Media Downloader", version="1.1.0")
+app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
 # --- Security Headers Middleware ---
 @app.middleware("http")
@@ -55,10 +57,15 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; img-src 'self' https:; media-src 'self' https: blob:; "
+        "style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; "
+        "base-uri 'self'; frame-ancestors 'self'; form-action 'self'"
+    )
     return response
 
 class InfoRequest(BaseModel):
-    url: str
+    url: str = Field(min_length=1, max_length=2048)
 
 def remove_temp_file(path: str):
     """Deletes temporary file after download completes."""
@@ -68,75 +75,19 @@ def remove_temp_file(path: str):
     except Exception as e:
         print(f"Error removing temp file {path}: {e}")
 
-# --- Rich Schema.org Structured Data for Homepage ---
 HOME_SCHEMA = {
     "@context": "https://schema.org",
-    "@graph": [
-        {
-            "@type": "WebApplication",
-            "@id": "https://gilinkdl.vercel.app/#webapp",
-            "name": "GI LINK",
-            "url": "https://gilinkdl.vercel.app/",
-            "description": "Fast universal video and audio downloader for Instagram Reels, YouTube, TikTok, Facebook, and more.",
-            "applicationCategory": "MultimediaApplication",
-            "operatingSystem": "All",
-            "author": {
-                "@type": "Person",
-                "name": "Ghalib Kamal"
-            },
-            "offers": {
-                "@type": "Offer",
-                "price": "0",
-                "priceCurrency": "USD"
-            }
-        },
-        {
-            "@type": "FAQPage",
-            "@id": "https://gilinkdl.vercel.app/#faq",
-            "mainEntity": [
-                {
-                    "@type": "Question",
-                    "name": "Is GI LINK completely free to use?",
-                    "acceptedAnswer": {
-                        "@type": "Answer",
-                        "text": "Yes, GI LINK is 100% free with no registration, subscriptions, or hidden charges. You can download personal copies of public media whenever needed."
-                    }
-                },
-                {
-                    "@type": "Question",
-                    "name": "Which websites and social networks are supported?",
-                    "acceptedAnswer": {
-                        "@type": "Answer",
-                        "text": "GI LINK supports Instagram Reels, YouTube videos/Shorts, TikTok, Facebook videos, Twitter/X clips, Reddit, Vimeo, SoundCloud, and hundreds of public video hosting sites."
-                    }
-                },
-                {
-                    "@type": "Question",
-                    "name": "Where are downloaded files saved on my device?",
-                    "acceptedAnswer": {
-                        "@type": "Answer",
-                        "text": "On Android and PC/Mac, files are saved in your default Downloads folder. On iPhone/iPad, Safari prompts you to save the file into the Files app or photo gallery."
-                    }
-                },
-                {
-                    "@type": "Question",
-                    "name": "Does GI LINK store copies of downloaded videos?",
-                    "acceptedAnswer": {
-                        "@type": "Answer",
-                        "text": "No. GI LINK operates as a transient bridge. We do not maintain any permanent database of files or user links. Media files temporarily created during streaming are immediately deleted once transmitted to your browser."
-                    }
-                },
-                {
-                    "@type": "Question",
-                    "name": "Can I download private Instagram or Facebook videos?",
-                    "acceptedAnswer": {
-                        "@type": "Answer",
-                        "text": "No. To protect user privacy, GI LINK only supports publicly accessible media links. Content from private accounts cannot be accessed or downloaded."
-                    }
-                }
-            ]
-        }
-    ]
+    "@type": "WebApplication",
+    "@id": "https://gilinkdl.vercel.app/#webapp",
+    "name": "GI LINK",
+    "url": "https://gilinkdl.vercel.app/",
+    "description": "Retrieve media from supported public links and choose from the formats GI LINK can provide.",
+    "applicationCategory": "MultimediaApplication",
+    "operatingSystem": "Web",
+    "author": {
+        "@type": "Person",
+        "name": "Ghalib Kamal"
+    }
 }
 
 # --- HTML Public Routes ---
@@ -144,8 +95,8 @@ HOME_SCHEMA = {
 @app.get("/", response_class=HTMLResponse)
 async def home():
     html = render_layout(
-        title="GI LINK - Universal Video & Audio Downloader | Instagram Reels, YouTube & More",
-        description="Download high-definition videos and MP3 audio from Instagram Reels, YouTube, TikTok, Facebook, Twitter/X, and 1000+ sites. Fast, free, and secure.",
+        title="GI LINK — Download public media links",
+        description="Check a public media link, review the available file formats, and download media you have permission to use.",
         canonical_path="",
         content_html=get_home_html(),
         schema_json=HOME_SCHEMA,
@@ -156,8 +107,8 @@ async def home():
 @app.get("/about", response_class=HTMLResponse)
 async def about_page():
     html = render_layout(
-        title="About GI LINK - High-Speed Universal Media Downloader",
-        description="Learn about GI LINK, our mission, technical architecture, and creator Ghalib Kamal. Designed for fast, privacy-first media archiving.",
+        title="About GI LINK — Public media link downloader",
+        description="Learn how GI LINK retrieves media from public links and how to use it responsibly.",
         canonical_path="/about",
         content_html=get_about_html(),
         extra_scripts=SUBPAGE_SCRIPTS
@@ -168,7 +119,7 @@ async def about_page():
 async def privacy_page():
     html = render_layout(
         title="Privacy Policy - GI LINK Media Downloader",
-        description="Read the GI LINK Privacy Policy. Learn how we safeguard user privacy with our strict zero-logging and ephemeral file-processing architecture.",
+        description="Read the GI LINK privacy policy, including how submitted links and temporary downloads are handled.",
         canonical_path="/privacy",
         content_html=get_privacy_html(),
         extra_scripts=SUBPAGE_SCRIPTS
@@ -179,7 +130,7 @@ async def privacy_page():
 async def terms_page():
     html = render_layout(
         title="Terms of Service - GI LINK Media Downloader",
-        description="Review the terms and conditions governing the use of GI LINK. Fair use policy, intellectual property disclosures, and acceptable use guidelines.",
+        description="Read the terms for using GI LINK responsibly with public media links you are authorized to download.",
         canonical_path="/terms",
         content_html=get_terms_html(),
         extra_scripts=SUBPAGE_SCRIPTS
@@ -190,7 +141,7 @@ async def terms_page():
 async def dmca_page():
     html = render_layout(
         title="DMCA & Copyright Policy - GI LINK",
-        description="GI LINK Digital Millennium Copyright Act (DMCA) compliance, non-hosting safe harbor disclosures, and copyright takedown contact information.",
+        description="Contact GI LINK with copyright concerns or requests about links processed by the service.",
         canonical_path="/dmca",
         content_html=get_dmca_html(),
         extra_scripts=SUBPAGE_SCRIPTS
@@ -289,13 +240,13 @@ async def ads_txt():
 # --- PWA & Icon Endpoints ---
 
 MANIFEST = {
-    "name": "GI LINK - Universal Media Downloader",
+    "name": "GI LINK - Public Media Link Downloader",
     "short_name": "GI LINK",
-    "description": "Download videos and audio from Instagram Reels, YouTube, TikTok, Facebook, Twitter/X and more.",
+    "description": "Check supported public media links, review available formats, and download media you are authorized to use.",
     "start_url": "/",
     "display": "standalone",
-    "background_color": "#020617",
-    "theme_color": "#020617",
+    "background_color": "#f7f8fa",
+    "theme_color": "#f7f8fa",
     "orientation": "any",
     "categories": ["utilities", "entertainment"],
     "icons": [
@@ -350,16 +301,12 @@ async def favicon():
     )
 
 SW_JS = """
-const CACHE_NAME = 'gilink-v3';
+const CACHE_NAME = 'gilink-v6';
 const STATIC_ASSETS = [
   '/',
-  '/about',
-  '/privacy',
-  '/terms',
-  '/dmca',
-  '/contact',
-  'https://cdn.tailwindcss.com',
-  'https://unpkg.com/lucide@latest'
+  '/static/style.css',
+  '/static/app.js',
+  '/icon-192.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -380,18 +327,22 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-  if (url.pathname.startsWith('/api/')) {
-    return event.respondWith(fetch(event.request));
+  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).then((response) => {
+        if (response.ok) caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response.clone()));
+        return response;
+      }).catch(async () => (await caches.match(event.request)) || caches.match('/'))
+    );
+    return;
   }
   event.respondWith(
     caches.match(event.request).then((cached) => {
       const fetched = fetch(event.request).then((response) => {
-        if (response && response.status === 200) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        }
+        if (response.ok) caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response.clone()));
         return response;
-      }).catch(() => cached);
+      });
       return cached || fetched;
     })
   );
@@ -422,12 +373,16 @@ def is_safe_media_url(url: str) -> tuple[bool, str]:
     if not parsed.netloc:
         return False, "Missing host domain."
 
-    if "@" in parsed.netloc:
+    if "@" in parsed.netloc or parsed.username is not None or parsed.password is not None:
         return False, "URLs containing user credentials are not allowed."
 
-    hostname = (parsed.hostname or "").strip().lower()
+    hostname = (parsed.hostname or "").strip().lower().rstrip(".")
     if not hostname:
         return False, "Missing hostname."
+    try:
+        parsed.port
+    except ValueError:
+        return False, "Invalid port."
 
     # Direct hostnames representing local/internal networks
     if hostname in ("localhost", "localtest.me") or hostname.endswith(".local") or hostname.endswith(".internal"):
@@ -437,7 +392,7 @@ def is_safe_media_url(url: str) -> tuple[bool, str]:
     try:
         ip_val = int(hostname, 0) if (hostname.isdigit() or hostname.startswith("0x")) else hostname
         ip = ipaddress.ip_address(ip_val)
-        if (ip.is_loopback or ip.is_private or ip.is_link_local or            ip.is_multicast or ip.is_reserved or ip.is_unspecified):
+        if not ip.is_global:
             return False, "Access to private or local IP addresses is forbidden."
         return True, ""
     except ValueError:
@@ -450,24 +405,37 @@ def is_safe_media_url(url: str) -> tuple[bool, str]:
             ip_str = sockaddr[0]
             try:
                 ip = ipaddress.ip_address(ip_str)
-                if (ip.is_loopback or ip.is_private or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified):
+                if not ip.is_global:
                     return False, f"Domain resolves to forbidden private address ({ip_str})."
             except ValueError:
                 continue
     except socket.gaierror:
-        # Offline sandbox or temporary DNS resolution failure: allowed if domain format is valid
-        pass
-    except Exception as e:
-        return False, f"URL validation failed: {str(e)}"
+        return False, "The host could not be resolved."
+    except Exception:
+        return False, "URL validation failed."
+
+    if not addr_info:
+        return False, "The host did not resolve to a public address."
 
     return True, ""
+
+
+def public_media_error(error: Exception, platform: str) -> str:
+    message = str(error).lower()
+    if platform == "Instagram" and any(term in message for term in ("login", "checkpoint", "cookie", "empty media response")):
+        return "Instagram did not provide this media. The post must be public and available without signing in."
+    if platform == "YouTube" and any(term in message for term in ("sign in", "bot", "confirm you")):
+        return "YouTube declined this request. Try a publicly available link again later."
+    if "unsupported url" in message or "no suitable extractor" in message:
+        return "This source or link format is not currently supported."
+    return "Could not retrieve this media. Check that the link is public and try again."
 
 @app.post("/api/info")
 async def fetch_info(req: InfoRequest):
     url = req.url.strip()
     if not url:
         return JSONResponse(status_code=400, content={"success": False, "error": "URL cannot be empty."})
-    if not (url.startswith("http://") or url.startswith("https://")):
+    if not url.lower().startswith(("http://", "https://")):
         url = "https://" + url
 
     safe, err_reason = is_safe_media_url(url)
@@ -478,7 +446,12 @@ async def fetch_info(req: InfoRequest):
         data = get_media_info(url)
         return JSONResponse(content={"success": True, "data": data})
     except Exception as e:
-        return JSONResponse(status_code=400, content={"success": False, "error": str(e)})
+        platform = detect_platform(url)
+        print(f"Media info failed for {platform}: {type(e).__name__}")
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "error": public_media_error(e, platform)},
+        )
 
 def stream_remote(proxy_url: str):
     """Stream chunks directly from proxied media pipeline to eliminate memory and disk overhead."""
@@ -556,14 +529,14 @@ def file_iterator(file_path: str, chunk_size: int = 64 * 1024):
 
 @app.get("/api/download")
 async def trigger_download(
-    url: str = Query(...),
-    format_spec: str = Query("best"),
+    url: str = Query(..., max_length=2048),
+    format_spec: str = Query("best", max_length=128),
     is_audio: bool = Query(False)
 ):
     url = url.strip()
     if not url:
         raise HTTPException(status_code=400, detail="Invalid URL: URL cannot be empty.")
-    if not (url.startswith("http://") or url.startswith("https://")):
+    if not url.lower().startswith(("http://", "https://")):
         url = "https://" + url
 
     safe, err_reason = is_safe_media_url(url)
@@ -578,6 +551,7 @@ async def trigger_download(
             if direct_resp:
                 return direct_resp
 
+    filepath = None
     try:
         result = download_media(url, format_spec, is_audio)
         filepath = result["filepath"]
@@ -604,6 +578,8 @@ async def trigger_download(
             background=BackgroundTask(remove_temp_file, filepath)
         )
     except Exception as e:
+        if filepath:
+            remove_temp_file(filepath)
         # Final safety net for YouTube if bot detection still triggers
         if detect_platform(url) == "YouTube" and not is_audio:
             direct = get_youtube_direct_stream(url, is_audio=is_audio, format_spec=format_spec)
@@ -612,18 +588,22 @@ async def trigger_download(
                 if direct_resp:
                     return direct_resp
 
-        err_msg = str(e)
-        if "Sign in to confirm you’re not a bot" in err_msg or "Sign in to confirm" in err_msg:
+        err_msg = str(e).lower()
+        if "sign in to confirm" in err_msg or "bot" in err_msg:
             raise HTTPException(
                 status_code=403,
-                detail="YouTube has blocked this cloud server IP (Bot Protection). To fix this, export cookies from YouTube and set YOUTUBE_COOKIES in Vercel Environment Variables, exactly like Instagram cookies."
+                detail=public_media_error(e, "YouTube")
             )
         if "Instagram requires" in err_msg or "INSTAGRAM_COOKIES" in err_msg:
             raise HTTPException(
                 status_code=403,
-                detail=err_msg
+                detail=public_media_error(e, "Instagram")
             )
-        raise HTTPException(status_code=500, detail=f"Download failed: {str(e)}")
+        print(f"Media download failed for {detect_platform(url)}: {type(e).__name__}")
+        raise HTTPException(
+            status_code=502,
+            detail=public_media_error(e, detect_platform(url)),
+        )
 
 @app.get("/api/health")
 async def health():
