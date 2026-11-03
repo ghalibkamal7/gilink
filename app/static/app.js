@@ -76,6 +76,7 @@
     const errorCard = document.getElementById('errorCard');
     const errorMessage = document.getElementById('errorMessage');
     const downloadStatus = document.getElementById('downloadStatus');
+    let downloadFrame;
 
     const setFormError = (message) => {
       formError.textContent = message;
@@ -165,67 +166,42 @@
       downloadStatus.hidden = !message;
     };
 
-    const parseFilename = (disposition, fallback) => {
-      const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition || '');
-      if (encoded) {
+    const getDownloadFrame = () => {
+      if (downloadFrame) return downloadFrame;
+      downloadFrame = document.createElement('iframe');
+      downloadFrame.title = 'Media download';
+      downloadFrame.hidden = true;
+      downloadFrame.addEventListener('load', () => {
+        if (downloadFrame.dataset.downloadStarted !== 'true') return;
         try {
-          return decodeURIComponent(encoded[1]);
-        } catch {
-          return fallback;
+          const responseDocument = downloadFrame.contentDocument;
+          if (!responseDocument?.contentType.includes('application/json')) return;
+          downloadFrame.dataset.downloadStarted = 'false';
+          const payload = JSON.parse(responseDocument.body.textContent || '{}');
+          const message = payload.detail || payload.error;
+          if (message) setDownloadStatus(message, true);
+        } catch (error) {
+          console.warn('GI LINK could not read the download error response.', error);
         }
-      }
-      const plain = /filename="?([^";]+)"?/i.exec(disposition || '');
-      return plain?.[1] || fallback;
+      });
+      document.body.append(downloadFrame);
+      return downloadFrame;
     };
 
-    const downloadMedia = async (url, formatSpec, isAudio, button) => {
+    const downloadMedia = (url, formatSpec, isAudio, button) => {
       button.disabled = true;
-      setDownloadStatus('Preparing your download…');
-      try {
-        const query = new URLSearchParams({
-          url,
-          format_spec: formatSpec,
-          is_audio: String(isAudio),
-        });
-        const response = await fetch(`/api/download?${query}`);
-        if (!response.ok) {
-          const error = await response.json().catch(() => null);
-          throw new Error(error?.detail || 'This file could not be downloaded. Try another format or link.');
-        }
-
-        const filenameFallback = isAudio ? 'audio-download.bin' : 'video-download.bin';
-        const filename = parseFilename(response.headers.get('content-disposition'), filenameFallback);
-        const chunks = [];
-        const total = Number(response.headers.get('content-length')) || 0;
-        let received = 0;
-        if (!response.body) throw new Error('The download stream is unavailable. Please try again.');
-        const reader = response.body.getReader();
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          chunks.push(value);
-          received += value.byteLength;
-          const downloaded = (received / (1024 * 1024)).toFixed(1);
-          const totalText = total ? ` of ${(total / (1024 * 1024)).toFixed(1)} MB` : '';
-          setDownloadStatus(`Downloading… ${downloaded} MB${totalText}`);
-        }
-
-        const mediaType = response.headers.get('content-type')?.split(';', 1)[0] || 'application/octet-stream';
-        const blobUrl = URL.createObjectURL(new Blob(chunks, { type: mediaType }));
-        const anchor = document.createElement('a');
-        anchor.href = blobUrl;
-        anchor.download = filename;
-        anchor.hidden = true;
-        document.body.append(anchor);
-        anchor.click();
-        anchor.remove();
-        window.setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
-        setDownloadStatus('Download ready. Check your browser’s downloads.');
-      } catch (error) {
-        setDownloadStatus(error instanceof Error ? error.message : 'The download failed. Please try again.', true);
-      } finally {
+      setDownloadStatus('Starting download… Check your browser’s downloads.');
+      const query = new URLSearchParams({
+        url,
+        format_spec: formatSpec,
+        is_audio: String(isAudio),
+      });
+      const frame = getDownloadFrame();
+      frame.dataset.downloadStarted = 'true';
+      frame.src = `/api/download?${query}`;
+      window.setTimeout(() => {
         button.disabled = false;
-      }
+      }, 1500);
     };
 
     form.addEventListener('submit', async (event) => {

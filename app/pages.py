@@ -4,7 +4,7 @@ import json
 from typing import Optional
 
 BASE_URL = "https://gilinkdl.vercel.app"
-ASSET_VERSION = "8"
+ASSET_VERSION = "9"
 
 
 def render_layout(
@@ -58,7 +58,7 @@ def render_layout(
   <header class="site-header">
     <div class="container header-inner">
       <a class="brand" href="/" aria-label="GI LINK home">
-        <span class="brand-mark" aria-hidden="true">gi</span>
+        <img class="brand-icon" src="/icon-192.png" alt="" width="31" height="31">
         <span>GI<span class="brand-light">LINK</span></span>
       </a>
       <button class="ui-mode-toggle" id="uiModeToggle" type="button" aria-pressed="true" aria-label="Switch to modern interface">Classic UI</button>
@@ -81,7 +81,7 @@ def render_layout(
     <div class="container footer-main">
       <div class="footer-brand">
         <a class="brand" href="/" aria-label="GI LINK home">
-          <span class="brand-mark" aria-hidden="true">gi</span>
+          <img class="brand-icon" src="/icon-192.png" alt="" width="31" height="31">
           <span>GI<span class="brand-light">LINK</span></span>
         </a>
         <p>Tools for working with public media links.</p>

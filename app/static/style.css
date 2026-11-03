@@ -44,7 +44,7 @@ img { display: block; max-width: 100%; }
 .header-inner { min-height: 72px; display: flex; align-items: center; justify-content: space-between; gap: 30px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 780; letter-spacing: -.055em; white-space: nowrap; }
 .brand-light { font-weight: 520; }
-.brand-mark { width: 31px; height: 31px; display: grid; place-items: center; border-radius: 9px; color: white; background: var(--brand); font-size: 15px; font-weight: 780; letter-spacing: -.1em; }
+.brand-icon { flex: 0 0 31px; width: 31px; height: 31px; border-radius: 9px; object-fit: cover; }
 .primary-nav { display: flex; align-items: center; gap: clamp(18px, 2.7vw, 34px); color: var(--ink-soft); font-size: 13px; font-weight: 550; }
 .primary-nav a, .footer-nav a { transition: color var(--ease); }
 .primary-nav a:hover, .footer-nav a:hover { color: var(--brand); }
@@ -308,7 +308,6 @@ body[data-ui-mode="classic"] {
   color: var(--ink);
 }
 body[data-ui-mode="classic"] .site-header { border-color: var(--line); background: rgb(9 13 22 / 92%); }
-body[data-ui-mode="classic"] .brand-mark { background: linear-gradient(135deg, #6366f1, #a855f7 65%, #ec4899); }
 body[data-ui-mode="classic"] .ui-mode-toggle,
 body[data-ui-mode="classic"] .menu-toggle,
 body[data-ui-mode="classic"] .history-trigger,

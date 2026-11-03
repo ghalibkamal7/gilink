@@ -176,10 +176,10 @@ class TestVerifiedIssues(unittest.TestCase):
             self.assertNotIn("innerHTML", script)
 
         app_script = Path("app/static/app.js").read_text(encoding="utf-8")
-        click_offset = app_script.index("anchor.click();")
-        revoke_offset = app_script.index("URL.revokeObjectURL(blobUrl)")
-        self.assertGreater(revoke_offset, click_offset)
-        self.assertIn("setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000)", app_script)
+        self.assertIn("frame.src = `/api/download?${query}`", app_script)
+        self.assertIn("downloadFrame.contentDocument", app_script)
+        self.assertNotIn("URL.createObjectURL", app_script)
+        self.assertNotIn("new Blob", app_script)
 
     def test_history_dialog_is_hidden_until_opened(self):
         home_html = get_home_html()
@@ -197,8 +197,9 @@ class TestVerifiedIssues(unittest.TestCase):
         self.assertIn("localStorage.setItem('gilink-ui-mode', mode)", app_script)
         self.assertIn('body[data-ui-mode="classic"]', stylesheet)
         self.assertIn(".modern-headline", stylesheet)
-        self.assertIn("/static/style.css?v=8", app_html)
-        self.assertIn("/static/app.js?v=8", app_html)
+        self.assertIn("/static/style.css?v=9", app_html)
+        self.assertIn("/static/app.js?v=9", app_html)
+        self.assertEqual(app_html.count('class="brand-icon" src="/icon-192.png"'), 2)
 
 
 if __name__ == "__main__":
