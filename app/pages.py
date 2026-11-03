@@ -4,6 +4,7 @@ import json
 from typing import Optional
 
 BASE_URL = "https://gilinkdl.vercel.app"
+ASSET_VERSION = "8"
 
 
 def render_layout(
@@ -12,7 +13,7 @@ def render_layout(
     canonical_path: str,
     content_html: str,
     schema_json: Optional[dict] = None,
-    extra_scripts: str = '<script src="/static/app.js" defer></script>',
+    extra_scripts: str = f'<script src="/static/app.js?v={ASSET_VERSION}" defer></script>',
 ) -> str:
     canonical_url = f"{BASE_URL}{canonical_path}"
     schema_tag = ""
@@ -48,11 +49,11 @@ def render_layout(
   <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
   <link rel="apple-touch-icon" href="/icon-192.png">
   <link rel="manifest" href="/manifest.json">
-  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/style.css?v={ASSET_VERSION}">
   <title>{title}</title>
   {schema_tag}
 </head>
-<body>
+<body data-ui-mode="classic">
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header">
     <div class="container header-inner">
@@ -60,6 +61,7 @@ def render_layout(
         <span class="brand-mark" aria-hidden="true">gi</span>
         <span>GI<span class="brand-light">LINK</span></span>
       </a>
+      <button class="ui-mode-toggle" id="uiModeToggle" type="button" aria-pressed="true" aria-label="Switch to modern interface">Classic UI</button>
       <button class="menu-toggle" id="menuToggle" type="button" aria-expanded="false" aria-controls="primaryNav" aria-label="Open menu">
         <span></span><span></span>
       </button>
@@ -110,7 +112,10 @@ def get_home_html() -> str:
       <div class="container hero-grid">
         <div class="hero-copy">
           <p class="eyebrow"><span class="eyebrow-dot"></span> A straightforward media tool</p>
-          <h1>Bring your media<br><span>with you.</span></h1>
+          <h1>
+            <span class="modern-headline">Bring your media<br><span>with you.</span></span>
+            <span class="classic-headline">Download <span>Video &amp; Audio</span> Online</span>
+          </h1>
           <p class="hero-description">Get a downloadable file from a public video or audio link. Choose an available format and save it to your device.</p>
           <div class="trust-notes">
             <span><span class="check-mark">✓</span> No account required</span>
@@ -323,5 +328,5 @@ def get_contact_html() -> str:
     )
 
 
-HOME_SCRIPTS = '<script src="/static/app.js" defer></script>'
-SUBPAGE_SCRIPTS = '<script src="/static/app.js" defer></script>'
+HOME_SCRIPTS = f'<script src="/static/app.js?v={ASSET_VERSION}" defer></script>'
+SUBPAGE_SCRIPTS = f'<script src="/static/app.js?v={ASSET_VERSION}" defer></script>'

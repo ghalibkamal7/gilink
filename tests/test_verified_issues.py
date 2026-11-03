@@ -14,7 +14,7 @@ from app.downloader import (
     extension_from_mime_type,
     media_type_for_file,
 )
-from app.pages import HOME_SCRIPTS, get_home_html
+from app.pages import HOME_SCRIPTS, get_home_html, render_layout
 from app.icons import get_favicon_bytes
 
 
@@ -102,11 +102,13 @@ class TestVerifiedIssues(unittest.TestCase):
             main.remove_temp_file(filepath)
 
     def test_video_presets_select_audio_video_muxing_with_ffmpeg(self):
-        for format_spec, expected_format in (
-            ("best", "bestvideo+bestaudio/best"),
-            ("18", "18/best[acodec!=none][vcodec!=none]/bestvideo+bestaudio/best"),
+        for url, format_spec, ffmpeg_available, expected_format, expected_merge in (
+            ("https://example.com/video", "best", True, "bestvideo+bestaudio/best", "mp4"),
+            ("https://example.com/video", "18", True, "18/best[acodec!=none][vcodec!=none]/bestvideo+bestaudio/best", "mp4"),
+            ("https://www.instagram.com/reel/DfPUcPmtIDs/", "best", True, "bestvideo+bestaudio/best", "mp4"),
+            ("https://www.instagram.com/reel/DfPUcPmtIDs/", "best", False, "best[vcodec!=none][acodec!=none]", None),
         ):
-            with self.subTest(format_spec=format_spec):
+            with self.subTest(url=url, format_spec=format_spec, ffmpeg_available=ffmpeg_available):
                 with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as media:
                     media.write(b"video and audio")
                     filepath = media.name
@@ -135,12 +137,12 @@ class TestVerifiedIssues(unittest.TestCase):
                     FakeYoutubeDL.options = []
                     FakeYoutubeDL.downloads = []
                     with patch("app.downloader.yt_dlp.YoutubeDL", FakeYoutubeDL), \
-                         patch("app.downloader.has_ffmpeg", return_value=True), \
+                         patch("app.downloader.has_ffmpeg", return_value=ffmpeg_available), \
                          patch("app.downloader.get_cookies_filepath", return_value=None):
-                        result = download_media("https://example.com/video", format_spec)
+                        result = download_media(url, format_spec)
 
                     self.assertEqual(FakeYoutubeDL.options[0]["format"], expected_format)
-                    self.assertEqual(FakeYoutubeDL.options[0]["merge_output_format"], "mp4")
+                    self.assertEqual(FakeYoutubeDL.options[0].get("merge_output_format"), expected_merge)
                     self.assertTrue(FakeYoutubeDL.downloads[0])
                     self.assertTrue(os.path.exists(result["filepath"]))
                 finally:
@@ -184,6 +186,19 @@ class TestVerifiedIssues(unittest.TestCase):
         stylesheet = Path("app/static/style.css").read_text(encoding="utf-8")
         self.assertIn('<dialog class="history-dialog" id="historyModal"', home_html)
         self.assertIn(".history-dialog:not([open]) { display: none; }", stylesheet)
+
+    def test_classic_and_modern_ui_toggle_is_available(self):
+        home_html = get_home_html()
+        app_html = render_layout("GI LINK", "Description", "", home_html)
+        app_script = Path("app/static/app.js").read_text(encoding="utf-8")
+        stylesheet = Path("app/static/style.css").read_text(encoding="utf-8")
+        self.assertIn('id="uiModeToggle"', app_html)
+        self.assertIn('data-ui-mode="classic"', app_html)
+        self.assertIn("localStorage.setItem('gilink-ui-mode', mode)", app_script)
+        self.assertIn('body[data-ui-mode="classic"]', stylesheet)
+        self.assertIn(".modern-headline", stylesheet)
+        self.assertIn("/static/style.css?v=8", app_html)
+        self.assertIn("/static/app.js?v=8", app_html)
 
 
 if __name__ == "__main__":

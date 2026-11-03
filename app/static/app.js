@@ -2,7 +2,38 @@
   const form = document.getElementById('urlForm');
   const menuToggle = document.getElementById('menuToggle');
   const primaryNav = document.getElementById('primaryNav');
+  const uiModeToggle = document.getElementById('uiModeToggle');
   let recentLinks = [];
+
+  if (uiModeToggle) {
+    let mode = 'classic';
+    try {
+      mode = localStorage.getItem('gilink-ui-mode') === 'modern' ? 'modern' : 'classic';
+    } catch (error) {
+      console.warn('GI LINK could not read the saved interface preference.', error);
+    }
+
+    const applyMode = () => {
+      document.body.dataset.uiMode = mode;
+      uiModeToggle.textContent = mode === 'classic' ? 'Classic UI' : 'Modern UI';
+      uiModeToggle.setAttribute('aria-pressed', String(mode === 'classic'));
+      uiModeToggle.setAttribute(
+        'aria-label',
+        `Switch to ${mode === 'classic' ? 'modern' : 'classic'} interface`,
+      );
+    };
+
+    applyMode();
+    uiModeToggle.addEventListener('click', () => {
+      mode = mode === 'classic' ? 'modern' : 'classic';
+      applyMode();
+      try {
+        localStorage.setItem('gilink-ui-mode', mode);
+      } catch (error) {
+        console.warn('GI LINK could not save the interface preference.', error);
+      }
+    });
+  }
 
   if (menuToggle && primaryNav) {
     menuToggle.addEventListener('click', () => {

@@ -301,11 +301,11 @@ async def favicon():
     )
 
 SW_JS = """
-const CACHE_NAME = 'gilink-v6';
+const CACHE_NAME = 'gilink-v8';
 const STATIC_ASSETS = [
   '/',
-  '/static/style.css',
-  '/static/app.js',
+  '/static/style.css?v=8',
+  '/static/app.js?v=8',
   '/icon-192.png'
 ];
 
