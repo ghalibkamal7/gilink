@@ -1,5 +1,6 @@
 import asyncio
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -12,9 +13,11 @@ from app.downloader import (
     download_media,
     download_youtube_fallback,
     extension_from_mime_type,
+    get_media_info,
     media_type_for_file,
+    _configure_static_ffmpeg,
 )
-from app.pages import HOME_SCRIPTS, get_home_html, render_layout
+from app.pages import ASSET_VERSION, HOME_SCRIPTS, get_home_html, render_layout
 from app.icons import get_favicon_bytes
 
 
@@ -148,6 +151,72 @@ class TestVerifiedIssues(unittest.TestCase):
                 finally:
                     main.remove_temp_file(filepath)
 
+    def test_static_ffmpeg_uses_tmp_when_the_installed_package_is_read_only(self):
+        static_ffmpeg = MagicMock()
+        static_ffmpeg_runtime = MagicMock()
+        static_ffmpeg.run = static_ffmpeg_runtime
+        static_ffmpeg_runtime.get_platform_dir.return_value = (
+            "/readonly/site-packages/static_ffmpeg/bin/linux"
+        )
+        static_ffmpeg_runtime.get_platform_key.return_value = "linux"
+
+        with patch.dict(sys.modules, {
+            "static_ffmpeg": static_ffmpeg,
+            "static_ffmpeg.run": static_ffmpeg_runtime,
+        }), patch("app.downloader.os.makedirs"):
+            error = _configure_static_ffmpeg()
+
+        self.assertIsNone(error)
+        static_ffmpeg.add_paths.assert_called_once_with(
+            download_dir=os.path.join(
+                tempfile.gettempdir(), "gilink-static-ffmpeg", "bin", "linux"
+            )
+        )
+        self.assertEqual(
+            static_ffmpeg_runtime.LOCK_FILE,
+            os.path.join(tempfile.gettempdir(), "gilink-static-ffmpeg", "ffmpeg.lock"),
+        )
+
+    def test_metadata_does_not_advertise_unmuxable_video_without_ffmpeg(self):
+        info = {
+            "title": "adaptive-only video",
+            "formats": [
+                {"format_id": "137", "vcodec": "avc1", "acodec": "none", "height": 1080, "ext": "mp4"},
+                {"format_id": "140", "vcodec": "none", "acodec": "mp4a", "ext": "m4a", "abr": 128},
+            ],
+        }
+
+        class FakeYoutubeDL:
+            downloads = []
+
+            def __init__(self, _options):
+                pass
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def extract_info(self, _url, download):
+                self.downloads.append(download)
+                return info
+
+        with patch("app.downloader.yt_dlp.YoutubeDL", FakeYoutubeDL), \
+             patch("app.downloader.has_ffmpeg", return_value=False), \
+             patch("app.downloader.get_cookies_filepath", return_value=None):
+            result = get_media_info("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+
+        self.assertEqual(FakeYoutubeDL.downloads, [False])
+        self.assertEqual(result["formats"], [])
+        self.assertEqual(result["presets"], [{
+            "id": "bestaudio/best",
+            "name": "Audio Only (Original format)",
+            "ext": "m4a",
+            "badge": "M4A",
+            "is_audio": True,
+        }])
+
     def test_icon_routes_match_file_signatures_and_content_types(self):
         async def get_response(handler):
             return await handler()
@@ -197,8 +266,8 @@ class TestVerifiedIssues(unittest.TestCase):
         self.assertIn("localStorage.setItem('gilink-ui-mode', mode)", app_script)
         self.assertIn('body[data-ui-mode="classic"]', stylesheet)
         self.assertIn(".modern-headline", stylesheet)
-        self.assertIn("/static/style.css?v=9", app_html)
-        self.assertIn("/static/app.js?v=9", app_html)
+        self.assertIn(f"/static/style.css?v={ASSET_VERSION}", app_html)
+        self.assertIn(f"/static/app.js?v={ASSET_VERSION}", app_html)
         self.assertEqual(app_html.count('class="brand-icon" src="/icon-192.png"'), 2)
 
 

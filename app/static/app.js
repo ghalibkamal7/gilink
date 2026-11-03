@@ -77,6 +77,7 @@
     const errorMessage = document.getElementById('errorMessage');
     const downloadStatus = document.getElementById('downloadStatus');
     let downloadFrame;
+    let downloadRequestId = 0;
 
     const setFormError = (message) => {
       formError.textContent = message;
@@ -189,8 +190,9 @@
     };
 
     const downloadMedia = (url, formatSpec, isAudio, button) => {
+      const requestId = ++downloadRequestId;
       button.disabled = true;
-      setDownloadStatus('Starting download… Check your browser’s downloads.');
+      setDownloadStatus('Preparing download… Check your browser’s downloads.');
       const query = new URLSearchParams({
         url,
         format_spec: formatSpec,
@@ -201,6 +203,9 @@
       frame.src = `/api/download?${query}`;
       window.setTimeout(() => {
         button.disabled = false;
+        if (requestId === downloadRequestId && !downloadStatus.classList.contains('is-error')) {
+          setDownloadStatus('Download requested. Check your browser’s downloads.');
+        }
       }, 1500);
     };
 

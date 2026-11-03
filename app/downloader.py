@@ -10,11 +10,35 @@ from typing import Dict, Any, List, Optional
 import requests
 import yt_dlp
 
-try:
-    import static_ffmpeg
-    static_ffmpeg.add_paths()
-except Exception:
-    pass
+def _configure_static_ffmpeg() -> Optional[Exception]:
+    try:
+        import static_ffmpeg
+        from static_ffmpeg import run as static_ffmpeg_runtime
+
+        package_binary_dir = static_ffmpeg_runtime.get_platform_dir()
+        package_has_ffmpeg = (
+            os.path.isfile(os.path.join(package_binary_dir, "installed.crumb"))
+            and os.path.isfile(os.path.join(package_binary_dir, "ffmpeg"))
+        )
+        if package_has_ffmpeg:
+            static_ffmpeg.add_paths()
+        else:
+            cache_dir = os.path.join(tempfile.gettempdir(), "gilink-static-ffmpeg")
+            os.makedirs(cache_dir, exist_ok=True)
+            static_ffmpeg_runtime.LOCK_FILE = os.path.join(cache_dir, "ffmpeg.lock")
+            executable_dir = os.path.join(
+                cache_dir, "bin", static_ffmpeg_runtime.get_platform_key()
+            )
+            static_ffmpeg.add_paths(download_dir=executable_dir)
+        return None
+    except Exception as error:
+        return error
+
+
+_ffmpeg_setup_error = _configure_static_ffmpeg()
+if _ffmpeg_setup_error:
+    print(f"GI LINK could not initialize FFmpeg: {type(_ffmpeg_setup_error).__name__}: {_ffmpeg_setup_error}")
+
 
 # Use /tmp for downloads (works on Vercel's read-only filesystem)
 DOWNLOAD_DIR = os.path.join(tempfile.gettempdir(), "omnidrop_downloads")
@@ -771,21 +795,22 @@ def get_media_info(url: str) -> Dict[str, Any]:
 
     video_options.sort(key=lambda x: x['height'], reverse=True)
 
-    if not video_options and not audio_options:
-        video_options.append({
-            "id": "best",
-            "quality": "Best Quality",
-            "height": 720,
-            "ext": "mp4",
-            "size": "Auto",
-            "type": "video"
-        })
-
-    presets = [
-        {"id": "best", "name": "Best Quality (Video + Audio)", "ext": "mp4", "badge": "Full"},
-        {"id": "18", "name": "Standard (360p + Audio)", "ext": "mp4", "badge": "Fast"},
-        audio_preset(audio_options[0]["ext"] if audio_options else ".m4a")
-    ]
+    presets = []
+    if video_options:
+        if ffmpeg_available:
+            presets.extend([
+                {"id": "best", "name": "Best Quality (Video + Audio)", "ext": "mp4", "badge": "Full"},
+                {"id": "18", "name": "Standard (360p + Audio)", "ext": "mp4", "badge": "Fast"},
+            ])
+        else:
+            presets.append({
+                "id": "best",
+                "name": "Best available (Video + Audio)",
+                "ext": video_options[0]["ext"],
+                "badge": video_options[0]["quality"],
+            })
+    if audio_options:
+        presets.append(audio_preset(audio_options[0]["ext"]))
 
     return {
         "title": title,

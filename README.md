@@ -11,7 +11,7 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Open `http://127.0.0.1:8000`. FFmpeg is optional; when it is available, the downloader can convert extracted audio to MP3. Without it, the interface identifies the source audio format instead.
+Open `http://127.0.0.1:8000`. FFmpeg enables audio/video muxing and MP3 conversion. On read-only serverless runtimes, GI LINK caches the FFmpeg binary under the writable temporary directory; if FFmpeg is unavailable, the interface only offers formats the server can return without conversion.
 
 ## Test
 
