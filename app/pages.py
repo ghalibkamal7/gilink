@@ -4,7 +4,7 @@ import json
 from typing import Optional
 
 BASE_URL = "https://gilinkdl.vercel.app"
-ASSET_VERSION = "13"
+ASSET_VERSION = "15"
 
 
 def render_layout(

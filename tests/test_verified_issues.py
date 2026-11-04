@@ -372,6 +372,17 @@ class TestVerifiedIssues(unittest.TestCase):
         self.assertIn("Created by Ghalib Kamal", app_html)
         self.assertNotIn('href="https://github.com/ghalibkamal7/gilink"', app_html)
 
+    def test_available_download_styles_match_both_themes(self):
+        stylesheet = Path("app/static/style.css").read_text(encoding="utf-8")
+        app_script = Path("app/static/app.js").read_text(encoding="utf-8")
+        self.assertIn(".format-button.is-video .format-icon", stylesheet)
+        self.assertIn(".format-button.is-audio .format-icon", stylesheet)
+        self.assertIn("body[data-ui-mode=\"classic\"] {", stylesheet)
+        self.assertIn("--format-hover: #182238", stylesheet)
+        self.assertIn("grid-template: \"main arrow\" auto \"info arrow\" auto", stylesheet)
+        self.assertIn("format-extension", app_script)
+        self.assertIn("format-size", app_script)
+
 
 if __name__ == "__main__":
     unittest.main()

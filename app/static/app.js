@@ -134,13 +134,13 @@
 
     const buildFormatButton = (preset, url) => {
       const button = document.createElement('button');
-      button.className = 'format-button';
+      const isAudio = preset.is_audio === true || preset.type === 'audio' || preset.ext === 'mp3';
+      button.className = `format-button ${isAudio ? 'is-audio' : 'is-video'}`;
       button.type = 'button';
       const main = document.createElement('span');
       main.className = 'format-main';
       const icon = document.createElement('span');
       icon.className = 'format-icon';
-      const isAudio = preset.is_audio === true || preset.type === 'audio' || preset.ext === 'mp3';
       icon.textContent = isAudio ? 'AUDIO' : 'VIDEO';
       const name = document.createElement('span');
       name.className = 'format-name';
@@ -149,8 +149,19 @@
 
       const detail = document.createElement('span');
       detail.className = 'format-info';
-      const info = [preset.ext?.toUpperCase(), preset.size].filter((value) => value && value !== 'Unknown size');
-      detail.textContent = info.join(' · ');
+      const extension = preset.ext?.toUpperCase();
+      if (extension) {
+        const extensionBadge = document.createElement('span');
+        extensionBadge.className = 'format-extension';
+        extensionBadge.textContent = extension;
+        detail.append(extensionBadge);
+      }
+      if (preset.size && preset.size !== 'Unknown size') {
+        const size = document.createElement('span');
+        size.className = 'format-size';
+        size.textContent = preset.size;
+        detail.append(size);
+      }
       const arrow = document.createElement('span');
       arrow.className = 'format-arrow';
       arrow.setAttribute('aria-hidden', 'true');
