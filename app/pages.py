@@ -4,7 +4,7 @@ import json
 from typing import Optional
 
 BASE_URL = "https://gilinkdl.vercel.app"
-ASSET_VERSION = "12"
+ASSET_VERSION = "13"
 
 
 def render_layout(
@@ -92,11 +92,10 @@ def render_layout(
         <a href="/terms">Terms</a>
         <a href="/dmca">Copyright</a>
         <a href="/contact">Contact</a>
-        <a href="https://github.com/ghalibkamal7/gilink" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span></a>
       </nav>
     </div>
     <div class="container footer-bottom">
-      <span>© 2026 GI LINK</span>
+      <span>Created by Ghalib Kamal</span>
       <span>Only download media you have permission to use.</span>
     </div>
   </footer>

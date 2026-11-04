@@ -6,6 +6,7 @@ import shutil
 import urllib.parse
 import mimetypes
 import subprocess
+from urllib.parse import urlparse
 from typing import Dict, Any, List, Optional
 import requests
 import yt_dlp
@@ -127,24 +128,26 @@ def sanitize_filename(name: str) -> str:
     return clean[:60] or "media_download"
 
 def detect_platform(url: str) -> str:
-    url_lower = url.lower()
-    if "youtube.com" in url_lower or "youtu.be" in url_lower:
+    host = (urlparse(url).hostname or "").lower().removeprefix("www.")
+    if host in {"youtube.com", "youtu.be", "youtube-nocookie.com"} or host.endswith(
+        (".youtube.com", ".youtube-nocookie.com")
+    ):
         return "YouTube"
-    elif "instagram.com" in url_lower:
+    if host == "instagram.com" or host.endswith(".instagram.com"):
         return "Instagram"
-    elif "facebook.com" in url_lower or "fb.watch" in url_lower:
+    if host in {"facebook.com", "fb.watch"} or host.endswith(".facebook.com"):
         return "Facebook"
-    elif "tiktok.com" in url_lower:
+    if host == "tiktok.com" or host.endswith(".tiktok.com"):
         return "TikTok"
-    elif "twitter.com" in url_lower or "x.com" in url_lower:
+    if host in {"twitter.com", "x.com"} or host.endswith((".twitter.com", ".x.com")):
         return "X (Twitter)"
-    elif "reddit.com" in url_lower or "redd.it" in url_lower:
+    if host in {"reddit.com", "redd.it"} or host.endswith(".reddit.com"):
         return "Reddit"
-    elif "pinterest.com" in url_lower or "pin.it" in url_lower:
+    if host in {"pinterest.com", "pin.it"} or host.endswith(".pinterest.com"):
         return "Pinterest"
-    elif "soundcloud.com" in url_lower:
+    if host == "soundcloud.com" or host.endswith(".soundcloud.com"):
         return "SoundCloud"
-    elif "vimeo.com" in url_lower:
+    if host == "vimeo.com" or host.endswith(".vimeo.com"):
         return "Vimeo"
     return "Universal Media"
 
@@ -729,7 +732,19 @@ def get_media_info(url: str) -> Dict[str, Any]:
                     raise ValueError("YouTube Bot Protection triggered on cloud server. Please export cookies from YouTube, set YOUTUBE_COOKIES in Vercel Environment Variables, and Redeploy.")
                 raise ValueError(f"YouTube media fetch failed: {err_msg}")
         else:
-            raise ValueError(f"Media fetch failed: {err_msg}")
+            if 'cookiefile' in ydl_opts:
+                retry_opts = dict(ydl_opts)
+                retry_opts.pop('cookiefile', None)
+                try:
+                    with yt_dlp.YoutubeDL(retry_opts) as retry_ydl:
+                        info = retry_ydl.extract_info(url, download=False)
+                except Exception as retry_err:
+                    raise ValueError(
+                        f"{platform} media fetch failed with and without configured cookies: "
+                        f"{err_msg}; {retry_err}"
+                    ) from retry_err
+            else:
+                raise ValueError(f"{platform} media fetch failed: {err_msg}") from e
 
     if not info:
         if platform == "YouTube":
@@ -919,64 +934,64 @@ def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[s
             info = ydl.extract_info(url, download=True)
     except Exception as e:
         err_msg = str(e)
-        if platform == "Instagram":
-            # Retry without cookies if cookies failed
-            if 'cookiefile' in ydl_opts:
-                retry_opts = dict(ydl_opts)
-                retry_opts.pop('cookiefile', None)
-                try:
-                    with yt_dlp.YoutubeDL(retry_opts) as retry_ydl:
-                        info = retry_ydl.extract_info(url, download=True)
-                except Exception as retry_err:
-                    cleanup_temp_req_files(req_id)
-                    retry_msg = str(retry_err)
-                    if "empty media response" in retry_msg or "login" in retry_msg.lower():
-                        raise ValueError(f"Instagram download requires valid session cookies. (Configured cookies failed: {err_msg}; retry without cookies failed: {retry_msg}). Please configure INSTAGRAM_COOKIES in Vercel environment variables.")
-                    raise ValueError(f"Instagram download failed (with cookies: {err_msg}; without cookies: {retry_msg})")
-            else:
-                cleanup_temp_req_files(req_id)
-                if "empty media response" in err_msg or "login" in err_msg.lower():
-                    raise ValueError("Instagram download requires valid session cookies on cloud servers. Please configure INSTAGRAM_COOKIES in Vercel environment variables.")
-                raise ValueError(f"Instagram download failed: {err_msg}")
-        elif platform == "YouTube":
-            # If ffmpeg failed or format unavailable, retry progressive
-            if "ffmpeg" in err_msg.lower() or "merge" in err_msg.lower() or "requested format" in err_msg.lower():
-                if is_audio:
-                    cleanup_temp_req_files(req_id)
-                    raise ValueError("MP3 conversion could not be completed. Please try another public media link.") from e
-                prog_opts = dict(ydl_opts)
-                prog_opts.pop('merge_output_format', None)
-                prog_opts.pop('postprocessors', None)
-                prog_opts['format'] = 'bestaudio/best' if is_audio else '22/18/best[vcodec!=none][acodec!=none]'
-                try:
-                    with yt_dlp.YoutubeDL(prog_opts) as retry_ydl:
-                        info = retry_ydl.extract_info(url, download=True)
-                except Exception:
-                    pass
-            if not info:
-                yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
-                if yt_fallback:
-                    return yt_fallback
-                cleanup_temp_req_files(req_id)
-                raise ValueError(f"YouTube download failed: {err_msg}")
-        else:
-            # For other platforms, if ffmpeg postprocessor failed, retry without it
-            if "ffmpeg" in err_msg.lower() or "requested format" in err_msg.lower():
-                if is_audio:
-                    cleanup_temp_req_files(req_id)
-                    raise ValueError("MP3 conversion could not be completed. Please try another public media link.") from e
-                prog_opts = dict(ydl_opts)
-                prog_opts.pop('merge_output_format', None)
-                prog_opts.pop('postprocessors', None)
-                prog_opts['format'] = 'best'
-                try:
-                    with yt_dlp.YoutubeDL(prog_opts) as retry_ydl:
-                        info = retry_ydl.extract_info(url, download=True)
-                except Exception:
-                    pass
-            if not info:
-                cleanup_temp_req_files(req_id)
-                raise ValueError(f"Download failed: {err_msg}")
+        lowered_error = err_msg.lower()
+        format_failed = any(term in lowered_error for term in ("ffmpeg", "merge", "requested format"))
+        if is_audio and format_failed and ydl_opts.get("postprocessors"):
+            cleanup_temp_req_files(req_id)
+            raise ValueError("MP3 conversion could not be completed. Please try another public media link.") from e
+
+        retry_options = []
+        if format_failed:
+            fallback_opts = dict(ydl_opts)
+            fallback_opts.pop('merge_output_format', None)
+            fallback_opts.pop('postprocessors', None)
+            fallback_opts['format'] = (
+                'bestaudio/best'
+                if is_audio
+                else 'best[vcodec!=none][acodec!=none]'
+            )
+            retry_options.append(fallback_opts)
+
+        if 'cookiefile' in ydl_opts:
+            no_cookie_opts = dict(ydl_opts)
+            no_cookie_opts.pop('cookiefile', None)
+            if format_failed:
+                no_cookie_opts.pop('merge_output_format', None)
+                no_cookie_opts.pop('postprocessors', None)
+                no_cookie_opts['format'] = (
+                    'bestaudio/best'
+                    if is_audio
+                    else 'best[vcodec!=none][acodec!=none]'
+                )
+            retry_options.append(no_cookie_opts)
+
+        retry_errors = []
+        for retry_opts in retry_options:
+            try:
+                with yt_dlp.YoutubeDL(retry_opts) as retry_ydl:
+                    info = retry_ydl.extract_info(url, download=True)
+                if info:
+                    break
+            except Exception as retry_error:
+                retry_errors.append(str(retry_error))
+
+        if not info and platform == "YouTube":
+            yt_fallback = download_youtube_fallback(url, req_id, is_audio=is_audio)
+            if yt_fallback:
+                return yt_fallback
+
+        if not info:
+            cleanup_temp_req_files(req_id)
+            if platform == "Instagram" and any(
+                term in lowered_error for term in ("empty media response", "login", "checkpoint")
+            ):
+                raise ValueError(
+                    "Instagram did not provide this media. The post must be public and "
+                    "available without signing in; if it requires a login, configure "
+                    "INSTAGRAM_COOKIES."
+                ) from e
+            retry_detail = f"; retries: {'; '.join(retry_errors)}" if retry_errors else ""
+            raise ValueError(f"{platform} download failed: {err_msg}{retry_detail}") from e
 
     # Locate the downloaded file
     filename = None

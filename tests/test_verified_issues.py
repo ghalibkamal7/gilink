@@ -12,6 +12,7 @@ from app.downloader import (
     audio_preset,
     download_media,
     download_youtube_fallback,
+    detect_platform,
     extension_from_mime_type,
     get_media_info,
     media_type_for_file,
@@ -151,6 +152,102 @@ class TestVerifiedIssues(unittest.TestCase):
                 finally:
                     main.remove_temp_file(filepath)
 
+    def test_supported_platform_hostnames_are_detected_exactly(self):
+        cases = {
+            "https://youtu.be/dQw4w9WgXcQ": "YouTube",
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ": "YouTube",
+            "https://www.instagram.com/reel/abc123/": "Instagram",
+            "https://vm.tiktok.com/abc123/": "TikTok",
+            "https://fb.watch/abc123/": "Facebook",
+            "https://x.com/creator/status/123": "X (Twitter)",
+            "https://redd.it/abc123": "Reddit",
+            "https://pin.it/abc123": "Pinterest",
+            "https://on.soundcloud.com/abc123": "SoundCloud",
+            "https://vimeo.com/123456": "Vimeo",
+            "https://youtube.com.attacker.example/video": "Universal Media",
+        }
+        for url, expected in cases.items():
+            with self.subTest(url=url):
+                self.assertEqual(detect_platform(url), expected)
+
+    def test_other_platform_retries_metadata_without_stale_cookies(self):
+        calls = []
+
+        class FakeYoutubeDL:
+            def __init__(self, options):
+                self.options = options
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def extract_info(self, _url, download):
+                calls.append((self.options, download))
+                if len(calls) == 1:
+                    raise ValueError("Authentication failed")
+                return {
+                    "title": "TikTok sample",
+                    "formats": [{
+                        "format_id": "progressive",
+                        "vcodec": "h264",
+                        "acodec": "aac",
+                        "height": 720,
+                        "ext": "mp4",
+                    }],
+                }
+
+        with patch("app.downloader.yt_dlp.YoutubeDL", FakeYoutubeDL), \
+             patch("app.downloader.get_cookies_filepath", return_value="/tmp/cookies.txt"), \
+             patch("app.downloader.has_ffmpeg", return_value=False):
+            result = get_media_info("https://www.tiktok.com/@creator/video/123456")
+
+        self.assertEqual(len(calls), 2)
+        self.assertIn("cookiefile", calls[0][0])
+        self.assertNotIn("cookiefile", calls[1][0])
+        self.assertEqual(result["platform"], "TikTok")
+        self.assertEqual(result["formats"][0]["quality"], "720p")
+
+    def test_non_youtube_format_failure_retries_only_with_audio_video_streams(self):
+        with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as media:
+            media.write(b"progressive video audio")
+            filepath = media.name
+        captured_options = []
+
+        class FakeYoutubeDL:
+            def __init__(self, options):
+                self.options = options
+                captured_options.append(options)
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def extract_info(self, _url, download):
+                if len(captured_options) == 1:
+                    raise ValueError("Requested format is not available")
+                return {"title": "sample"}
+
+            def prepare_filename(self, _info):
+                return filepath
+
+        try:
+            with patch("app.downloader.yt_dlp.YoutubeDL", FakeYoutubeDL), \
+                 patch("app.downloader.has_ffmpeg", return_value=True), \
+                 patch("app.downloader.get_cookies_filepath", return_value=None):
+                result = download_media("https://www.tiktok.com/@creator/video/123456", "best")
+
+            self.assertEqual(
+                captured_options[1]["format"],
+                "best[vcodec!=none][acodec!=none]",
+            )
+            self.assertEqual(result["filename"], os.path.basename(filepath))
+        finally:
+            main.remove_temp_file(filepath)
+
     def test_static_ffmpeg_uses_tmp_when_the_installed_package_is_read_only(self):
         static_ffmpeg = MagicMock()
         static_ffmpeg_runtime = MagicMock()
@@ -269,6 +366,11 @@ class TestVerifiedIssues(unittest.TestCase):
         self.assertIn(f"/static/style.css?v={ASSET_VERSION}", app_html)
         self.assertIn(f"/static/app.js?v={ASSET_VERSION}", app_html)
         self.assertEqual(app_html.count('class="brand-icon" src="/icon-192.png"'), 2)
+
+    def test_footer_credits_creator_without_github_link(self):
+        app_html = render_layout("GI LINK", "Description", "", get_home_html())
+        self.assertIn("Created by Ghalib Kamal", app_html)
+        self.assertNotIn('href="https://github.com/ghalibkamal7/gilink"', app_html)
 
 
 if __name__ == "__main__":
