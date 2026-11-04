@@ -3,6 +3,7 @@ import re
 import socket
 import ipaddress
 import urllib.parse
+import importlib
 from typing import Optional, Dict, Any, List
 from pathlib import Path
 from fastapi import FastAPI, Request, HTTPException, Query
@@ -11,10 +12,37 @@ from starlette.background import BackgroundTask
 from starlette.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-try:
-    from .downloader import get_media_info, download_media, get_youtube_direct_stream, detect_platform, media_type_for_file
-except ImportError:
-    from downloader import get_media_info, download_media, get_youtube_direct_stream, detect_platform, media_type_for_file
+_downloader_module = None
+
+
+def _get_downloader():
+    global _downloader_module
+    if _downloader_module is None:
+        module_name = f"{__package__}.downloader" if __package__ else "downloader"
+        _downloader_module = importlib.import_module(module_name)
+    return _downloader_module
+
+
+def get_media_info(url: str) -> Dict[str, Any]:
+    return _get_downloader().get_media_info(url)
+
+
+def download_media(url: str, format_spec: str, is_audio: bool = False) -> Dict[str, Any]:
+    return _get_downloader().download_media(url, format_spec, is_audio)
+
+
+def get_youtube_direct_stream(
+    url: str, is_audio: bool = False, format_spec: str = "best"
+) -> Optional[Dict[str, Any]]:
+    return _get_downloader().get_youtube_direct_stream(url, is_audio, format_spec)
+
+
+def detect_platform(url: str) -> str:
+    return _get_downloader().detect_platform(url)
+
+
+def media_type_for_file(filename: str, is_audio: bool) -> str:
+    return _get_downloader().media_type_for_file(filename, is_audio)
 
 try:
     from .icons import get_icon_bytes, get_favicon_bytes

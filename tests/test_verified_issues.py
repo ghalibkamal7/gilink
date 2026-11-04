@@ -1,5 +1,6 @@
 import asyncio
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -23,6 +24,20 @@ from app.icons import get_favicon_bytes
 
 
 class TestVerifiedIssues(unittest.TestCase):
+    def test_downloader_is_not_imported_for_initial_page_load(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "import sys; import app.main; "
+                "assert 'app.downloader' not in sys.modules",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_audio_extensions_and_mime_types_match_original_formats(self):
         cases = {
             "audio/aac": ".aac",
