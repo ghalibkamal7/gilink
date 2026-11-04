@@ -382,6 +382,8 @@ class TestVerifiedIssues(unittest.TestCase):
         self.assertIn("grid-template: \"main arrow\" auto \"info arrow\" auto", stylesheet)
         self.assertIn("format-extension", app_script)
         self.assertIn("format-size", app_script)
+        self.assertIn("const accessibleDetails = [extension, sizeLabel].filter(Boolean);", app_script)
+        self.assertNotIn("info.length", app_script)
 
 
 if __name__ == "__main__":

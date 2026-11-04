@@ -150,16 +150,17 @@
       const detail = document.createElement('span');
       detail.className = 'format-info';
       const extension = preset.ext?.toUpperCase();
+      const sizeLabel = preset.size && preset.size !== 'Unknown size' ? preset.size : '';
       if (extension) {
         const extensionBadge = document.createElement('span');
         extensionBadge.className = 'format-extension';
         extensionBadge.textContent = extension;
         detail.append(extensionBadge);
       }
-      if (preset.size && preset.size !== 'Unknown size') {
+      if (sizeLabel) {
         const size = document.createElement('span');
         size.className = 'format-size';
-        size.textContent = preset.size;
+        size.textContent = sizeLabel;
         detail.append(size);
       }
       const arrow = document.createElement('span');
@@ -167,7 +168,11 @@
       arrow.setAttribute('aria-hidden', 'true');
       arrow.textContent = '↓';
       button.append(main, detail, arrow);
-      button.setAttribute('aria-label', `Download ${name.textContent}${info.length ? `, ${info.join(', ')}` : ''}`);
+      const accessibleDetails = [extension, sizeLabel].filter(Boolean);
+      button.setAttribute(
+        'aria-label',
+        `Download ${name.textContent}${accessibleDetails.length ? `, ${accessibleDetails.join(', ')}` : ''}`,
+      );
       button.addEventListener('click', () => downloadMedia(url, preset.id, isAudio, button));
       return button;
     };
