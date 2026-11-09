@@ -357,8 +357,14 @@ class TestVerifiedIssues(unittest.TestCase):
             self.assertNotIn("innerHTML", script)
 
         app_script = Path("app/static/app.js").read_text(encoding="utf-8")
-        self.assertIn("frame.src = `/api/download?${query}`", app_script)
+        self.assertIn("const downloadUrl = `/api/download?${query}`", app_script)
+        self.assertIn("navigator.userAgentData?.mobile", app_script)
+        self.assertIn("/Android|iPhone|iPad|iPod|Mobile/i", app_script)
+        self.assertIn("link.download = '';", app_script)
+        self.assertIn("link.click();", app_script)
+        self.assertIn("retryLink.download = '';", app_script)
         self.assertIn("downloadFrame.contentDocument", app_script)
+        self.assertIn("if (useNativeDownload)", app_script)
         self.assertNotIn("URL.createObjectURL", app_script)
         self.assertNotIn("new Blob", app_script)
 

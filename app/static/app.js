@@ -77,7 +77,8 @@
     const errorMessage = document.getElementById('errorMessage');
     const downloadStatus = document.getElementById('downloadStatus');
     let downloadFrame;
-    let downloadRequestId = 0;
+    const useNativeDownload = Boolean(navigator.userAgentData?.mobile)
+      || /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
     const setFormError = (message) => {
       formError.textContent = message;
@@ -177,8 +178,16 @@
       return button;
     };
 
-    const setDownloadStatus = (message, failed = false) => {
-      downloadStatus.textContent = message;
+    const setDownloadStatus = (message, failed = false, retryUrl = '') => {
+      downloadStatus.replaceChildren(document.createTextNode(message));
+      if (retryUrl) {
+        const retryLink = document.createElement('a');
+        retryLink.className = 'download-retry';
+        retryLink.href = retryUrl;
+        retryLink.download = '';
+        retryLink.textContent = 'Tap here to retry';
+        downloadStatus.append(' ', retryLink);
+      }
       downloadStatus.classList.toggle('is-error', failed);
       downloadStatus.hidden = !message;
     };
@@ -206,23 +215,33 @@
     };
 
     const downloadMedia = (url, formatSpec, isAudio, button) => {
-      const requestId = ++downloadRequestId;
       button.disabled = true;
-      setDownloadStatus('Preparing download… Check your browser’s downloads.');
       const query = new URLSearchParams({
         url,
         format_spec: formatSpec,
         is_audio: String(isAudio),
       });
-      const frame = getDownloadFrame();
-      frame.dataset.downloadStarted = 'true';
-      frame.src = `/api/download?${query}`;
-      window.setTimeout(() => {
-        button.disabled = false;
-        if (requestId === downloadRequestId && !downloadStatus.classList.contains('is-error')) {
-          setDownloadStatus('Download requested. Check your browser’s downloads.');
-        }
-      }, 1500);
+      const downloadUrl = `/api/download?${query}`;
+      setDownloadStatus(
+        'Starting download… If it does not appear, check Downloads or retry here.',
+        false,
+        downloadUrl,
+      );
+      if (useNativeDownload) {
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = '';
+        link.hidden = true;
+        document.body.append(link);
+        link.click();
+        link.remove();
+        window.setTimeout(() => { button.disabled = false; }, 5000);
+      } else {
+        const frame = getDownloadFrame();
+        frame.dataset.downloadStarted = 'true';
+        frame.src = downloadUrl;
+        window.setTimeout(() => { button.disabled = false; }, 1500);
+      }
     };
 
     form.addEventListener('submit', async (event) => {
